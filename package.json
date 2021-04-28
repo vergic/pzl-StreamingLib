@@ -1,0 +1,16 @@
+{
+  "name": "vngage-StreamLib",
+  "version": "0.1.0",
+  "description": "Internal Streaming library for Vergic/vngage",
+  "license": "UNLICENSED",
+  "main": "dist/index.js",
+  "engines": {
+    "node": ">=0.10.24"
+  },
+  "scripts": {},
+  "dependencies": {
+    "@microsoft/signalr": "^5.0.5",
+    "es6-promise": "^4.2.8",
+    "machina": "^4.0.2"
+  }
+}
