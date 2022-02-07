@@ -8,7 +8,6 @@
     "node": ">=0.10.24"
   },
   "scripts": {
-    "install": "npm run build",
     "prebuild": "rimraf dist/*.js",
     "build": "npm run build:prod && npm run build:dev",
     "build:dev": "webpack -c webpack.dev.deps.config.js && webpack -c webpack.dev.config.js",
