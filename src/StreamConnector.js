@@ -1,13 +1,12 @@
-define(function (require) {
+define(['require'], function(require) {
 	'use strict';
 
-	var //signalR = require('signalr'),
-		signalR = require('vendor/signalR/signalr_5.0.5_vngage'),
-		Promise = require('es6-promise'),
-		machina = require('machina'),
+	var signalr = require('@microsoft/signalr/dist/browser/signalr'),
 		StreamErrors = require('./StreamErrors'),
 		StreamUtils = require('./StreamUtils'),
 		StreamEventTypes = require('./StreamEventTypes');
+
+	var machina = null;
 
 	var reconnectRetryDelay = 3;
 	var resubscribeDelay = 1;
@@ -32,134 +31,136 @@ define(function (require) {
 	var subscriptions = {};
 	var lastSubscribeInvocationId = 0;
 
+	var brokerConnection = null;
 
-
-	/*******************************************************************************************
-	 ** brokerConnection state machine
-	 * Should probably be broken out from this module...
-	 *******************************************************************************************/
-	var brokerConnection = new machina.Fsm({
-		initialize: function() {
-			this.connection = null;
-			this.reconnectCounter = 0;
-		},
-
-		initialState: 'disconnected',
-
-		states: {
-			disconnected: {
-				_onEnter: function() {
-					debug.log('FSM: disconnected._onEnter()');
-					this.connection = null;
-				},
-				connect: function () {
-					this.transition('connecting');
-				}
+	function initBrokerConnectionFsm(machina) {
+		/*******************************************************************************************
+		 ** brokerConnection state machine
+		 * Should probably be broken out from this module...
+		 *******************************************************************************************/
+		brokerConnection = new machina.Fsm({
+			initialize: function() {
+				this.connection = null;
+				this.reconnectCounter = 0;
 			},
-			connecting: {
-				_onEnter: function() {
-					debug.log('FSM: connecting._onEnter()');
-					_connect();
-				},
-				connection_ok: function (connection) {
-					this.connection = connection;
-					this.transition('connected');
-				},
-				connection_failed: function (err) {
-					this.transition('disconnected');
-				},
-				disconnect: function () {
-					this.transition('disconnecting');
-				}
-			},
-			connected: {
-				_onEnter: function() {
-					debug.log('FSM: connected._onEnter()');
-				},
-				connection_failed: function () {
-					// Broker connection closed in "connected"-state - try to auto-reconnect to broker...
-					if (brokerEventCallbacks && typeof brokerEventCallbacks.onConnectionFailed === 'function') {
-						brokerEventCallbacks.onConnectionFailed('connection failed');
-					}
-					this.connection = null;
-					this.reconnectCounter = 0;
-					this.transition('reconnect_wait');
-				},
-				disconnect: function () {
-					this.transition('disconnecting');
-				}
-			},
-			reconnect_wait: {
-				_onEnter: function () {
-					debug.log('FSM: reconnect_wait._onEnter()');
-					if (this.reconnectCounter < reconnectMaxRetries) {
-						this.handle('schedule_reconnect');
-					} else { // i.e. don't try to reconnect even once if reconnectMaxRetries <= 0
-						this.handle('reconnection_failed');
+
+			initialState: 'disconnected',
+
+			states: {
+				disconnected: {
+					_onEnter: function() {
+						debug.log('FSM: disconnected._onEnter()');
+						this.connection = null;
+					},
+					connect: function () {
+						this.transition('connecting');
 					}
 				},
-				schedule_reconnect: function () {
-					debug.log('FSM reconnect_wait.schedule_reconnect(): Reconnecting to broker in ' + reconnectRetryDelay + ' sec...');
-					clearTimeout(this.reconnectTimer);	// Just make sure no other reconnects are already scheduled (should not happen, but maybe SignalR's connection.onclose() *could* be fired twice in that case we'd end up here twice before handling the 'reconnect'-action...)
-					this.reconnectTimer = setTimeout(function () {
-						this.handle('connect');
-					}.bind(this), reconnectRetryDelay * 1000);
-				},
-				connect: function () {
-					this.transition('reconnecting');
-				},
-				disconnect: function () {
-					this.transition('disconnecting');
-				},
-				reconnection_failed: function () {
-					this.transition('disconnected');
-				},
-				_onExit: function () {
-					clearTimeout(this.reconnectTimer);
-				}
-			},
-			reconnecting: {
-				_onEnter: function() {
-					debug.log('FSM: reconnecting._onEnter()');
-					this.reconnectCounter++;
-					_connect();
-				},
-				connection_ok: function (connection) {
-					this.connection = connection;
-					this.transition('connected');
-					reSubscribeAll();	// After successful re-connect, also re-subscribe to all topics! (i.e. different from "connection_ok" in the state "connecting")
-				},
-				connection_failed: function (err) {
-					if (brokerEventCallbacks && typeof brokerEventCallbacks.onConnectionFailed === 'function') {
-						brokerEventCallbacks.onConnectionFailed(err);
+				connecting: {
+					_onEnter: function() {
+						debug.log('FSM: connecting._onEnter()');
+						_connect();
+					},
+					connection_ok: function (connection) {
+						this.connection = connection;
+						this.transition('connected');
+					},
+					connection_failed: function (err) {
+						this.transition('disconnected');
+					},
+					disconnect: function () {
+						this.transition('disconnecting');
 					}
-					this.transition('reconnect_wait');
 				},
-				disconnect: function () {
-					this.transition('disconnecting');
-				}
-			},
-			disconnecting: {
-				_onEnter: function() {
-					debug.log('FSM: disconnecting._onEnter()');
-					unSubscribeAll();
+				connected: {
+					_onEnter: function() {
+						debug.log('FSM: connected._onEnter()');
+					},
+					connection_failed: function () {
+						// Broker connection closed in "connected"-state - try to auto-reconnect to broker...
+						if (brokerEventCallbacks && typeof brokerEventCallbacks.onConnectionFailed === 'function') {
+							brokerEventCallbacks.onConnectionFailed('connection failed');
+						}
+						this.connection = null;
+						this.reconnectCounter = 0;
+						this.transition('reconnect_wait');
+					},
+					disconnect: function () {
+						this.transition('disconnecting');
+					}
+				},
+				reconnect_wait: {
+					_onEnter: function () {
+						debug.log('FSM: reconnect_wait._onEnter()');
+						if (this.reconnectCounter < reconnectMaxRetries) {
+							this.handle('schedule_reconnect');
+						} else { // i.e. don't try to reconnect even once if reconnectMaxRetries <= 0
+							this.handle('reconnection_failed');
+						}
+					},
+					schedule_reconnect: function () {
+						debug.log('FSM reconnect_wait.schedule_reconnect(): Reconnecting to broker in ' + reconnectRetryDelay + ' sec...');
+						clearTimeout(this.reconnectTimer);	// Just make sure no other reconnects are already scheduled (should not happen, but maybe SignalR's connection.onclose() *could* be fired twice in that case we'd end up here twice before handling the 'reconnect'-action...)
+						this.reconnectTimer = setTimeout(function () {
+							this.handle('connect');
+						}.bind(this), reconnectRetryDelay * 1000);
+					},
+					connect: function () {
+						this.transition('reconnecting');
+					},
+					disconnect: function () {
+						this.transition('disconnecting');
+					},
+					reconnection_failed: function () {
+						this.transition('disconnected');
+					},
+					_onExit: function () {
+						clearTimeout(this.reconnectTimer);
+					}
+				},
+				reconnecting: {
+					_onEnter: function() {
+						debug.log('FSM: reconnecting._onEnter()');
+						this.reconnectCounter++;
+						_connect();
+					},
+					connection_ok: function (connection) {
+						this.connection = connection;
+						this.transition('connected');
+						reSubscribeAll();	// After successful re-connect, also re-subscribe to all topics! (i.e. different from "connection_ok" in the state "connecting")
+					},
+					connection_failed: function (err) {
+						if (brokerEventCallbacks && typeof brokerEventCallbacks.onConnectionFailed === 'function') {
+							brokerEventCallbacks.onConnectionFailed(err);
+						}
+						this.transition('reconnect_wait');
+					},
+					disconnect: function () {
+						this.transition('disconnecting');
+					}
+				},
+				disconnecting: {
+					_onEnter: function() {
+						debug.log('FSM: disconnecting._onEnter()');
+						unSubscribeAll();
 
-					if (!this.connection) {
-						// No connection to stop - fire "disconnect_ok"-action at once
-						this.handle('disconnect_ok');
-					} else {
-						this.connection.stop().catch(function() {}).finally(function() {
-							debug.log('connection stopped');
+						if (!this.connection) {
+							// No connection to stop - fire "disconnect_ok"-action at once
 							this.handle('disconnect_ok');
-						}.bind(this));
+						} else {
+							this.connection.stop().catch(function() {}).finally(function() {
+								debug.log('connection stopped');
+								this.handle('disconnect_ok');
+							}.bind(this));
+						}
+					},
+					disconnect_ok: function () {
+						this.transition('disconnected');
 					}
-				},
-				disconnect_ok: function () {
-					this.transition('disconnected');
 				}
 			}
-		}
-	});
+		});
+	}
 
 
 
@@ -179,23 +180,23 @@ define(function (require) {
 				break;
 			case 'LongPolling':
 				brokerConnectionOptions = {
-					transport: signalR.HttpTransportType.LongPolling
+					transport: signalr.HttpTransportType.LongPolling
 				}
 				break;
 			case 'ServerSentEvents':
 				brokerConnectionOptions = {
-					transport: signalR.HttpTransportType.ServerSentEvents
+					transport: signalr.HttpTransportType.ServerSentEvents
 				}
 				break;
 			default:
 				// Use WebSockets without negotiation by default... Is this ok? Do we ever want WebSockets *WITH* negotiation?
 				brokerConnectionOptions = {
 					skipNegotiation: true,
-					transport: signalR.HttpTransportType.WebSockets
+					transport: signalr.HttpTransportType.WebSockets
 				}
 		}
 
-		var hubConnectionBuilder = new signalR.HubConnectionBuilder()
+		var hubConnectionBuilder = new signalr.HubConnectionBuilder()
 			.withUrl(options.brokerUrl, brokerConnectionOptions)
 			.configureLogging(options.brokerLogLevel)
 			.withAutomaticReconnect([0, 500, 3000, 5000, 10000]);
@@ -517,7 +518,7 @@ define(function (require) {
 /*
 									if (useSignalRv3) {
 										// SignalRv3 detected: Do nothing (let auto-reconnect take care of the business)
-										// TODO: SOME stream errors should be handled here on signalR v3, e.g. "slow consumer", etc
+										// TODO: SOME stream errors should be handled here on signalr v3, e.g. "slow consumer", etc
 */
 										debug.log('SignalR v3: Do nothing (let auto-reconnect take care of business)');
 /*
@@ -647,18 +648,41 @@ define(function (require) {
 
 
 	/*******************************************************************************************
-	 ** Init funciton to set sessionId and hook up some subscriptions from visitor application
+	 ** Init function to configure StreamConnector
+	 *
+	 *   brokerUrl 		= URL to CommSrv broker endpoint (Note: Should include sessionId as query parameter!)
+	 *
+	 *   streamOptions	= Config object for signalR and related behavior
+	 *    	streamOptions.brokerTransport (optional, default 'WebSockets'):
+	 *      	One of: 'None' | 'Negotiate' | 'WebSockets' | 'LongPolling' | 'ServerSentEvents'
+	 *      streamOptions.brokerLogLevel (optional, default 'none'):
+	 *        	One of: 'trace' | 'debug' | 'info' | 'warn' | 'error' | 'critical' | 'none'
+	 *      streamOptions.streamingSubscribeOnly (optional, default false):
+	 *      	If true, topic history/state is not fetched using 'Get' (i.e. everything is streamed using 'Subscribe' only)
+	 *
+	 *   eventHandlers	= Object containing (optional) event handler hook functions, e.g.
+	 *    	{
+	 *    		onConnectionStarted = function (connection) { // Do something on broker connection started...  },
+	 *    		onConnectionFailed = function (connection) { // Do something on broker connection failed... },
+	 *		}
+	 *
+	 *	 dependencyLibs	= Object containing dependency libraries (for now, only 'machina')
+	 *	 	This library needs to be injected at runtime (Visitor already uses it, so we don't want to include it twice)
+	 *
+	 *	 initDebug		= Optional object containing debug functions, e.g.
+	 *	 	{
+	 * 			log: function () { ... },
+	 * 			warn: function () { ... },
+	 * 			error: function () { ... },
+	 * 			info: function () { ... },
+	 *	 	}
 	 *******************************************************************************************/
-	var init = function init(brokerUrl, streamOptions, eventHandlers,  initDebug) {
+	var init = function init(brokerUrl, streamOptions, eventHandlers, dependencyLibs, initDebug) {
 
-		// initBrokerUrl:
-		//		URL to connect to broker. Can include a ?sessionId=<sId> for authenticated connectoins with broker v1 in CommSrv
-		// initBrokerTransport (optional, default 'WebSockets'):
-		// 		One of: 'None' | 'Negotiate' | 'WebSockets' | 'LongPolling' | 'ServerSentEvents'
-		// initBrokerLogLevel (optional, default 'none'):
-		// 		One of: 'trace' | 'debug' | 'info' | 'warn' | 'error' | 'critical' | 'none'
-		// initDebug (optional, default noop):
-		// 		Debug-object implementing functions log(), warn(), error(), info()
+		if (!machina) {
+			machina = dependencyLibs.machina;
+			initBrokerConnectionFsm(machina);
+		}
 
 		streamOptions = streamOptions || {};
 		initDebug = initDebug || noDebug;
@@ -676,7 +700,7 @@ define(function (require) {
 			brokerEventCallbacks = eventHandlers;
 
 			debug.log('Initializing StreamConnector');
-			debug.log('SignalR client lib version:', signalR.VERSION);
+			debug.log('SignalR client lib version:', signalr.VERSION);
 
 			if (!isDisconnected()) {
 				// If we have an active connection: Re-connect to broker with the new brokerUrl...
@@ -690,6 +714,7 @@ define(function (require) {
 	};
 
 	return {
+		_signalr: signalr,	// Expose the signalr lib  - mainly for debugging...
 		init: init,
 		getSubscriptions: getSubscriptions,
 		addSubscription: addSubscription,

@@ -3,14 +3,49 @@
   "version": "0.1.0",
   "description": "Internal Streaming library for Vergic/vngage",
   "license": "UNLICENSED",
-  "main": "dist/index.js",
+  "main": "dist/vngageStreamLib.js",
   "engines": {
     "node": ">=0.10.24"
   },
-  "scripts": {},
+  "scripts": {
+    "install": "npm run build",
+    "prebuild": "rimraf dist/*.js",
+    "build": "npm run build:prod && npm run build:dev",
+    "build:dev": "webpack -c webpack.dev.deps.config.js && webpack -c webpack.dev.config.js",
+    "build:prod": "webpack -c webpack.prod.deps.config.js && webpack -c webpack.prod.config.js",
+    "watch": "onchange \"src/**/*.js\" -- npm run build"
+  },
   "dependencies": {
-    "@microsoft/signalr": "^5.0.5",
+    "@microsoft/signalr": "^6.0.1",
+    "babel-runtime": "^7.0.0-beta.3",
+    "buffer": "^6.0.3",
     "es6-promise": "^4.2.8",
-    "machina": "^4.0.2"
+    "eventsource": "^1.0.7",
+    "https-browserify": "^1.0.0",
+    "machina": "^4.0.2",
+    "net": "^1.0.2",
+    "stream-http": "^3.2.0",
+    "url": "^0.11.0",
+    "util": "^0.12.3"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.17.0",
+    "@babel/plugin-proposal-export-default-from": "^7.16.7",
+    "@babel/plugin-proposal-object-rest-spread": "^7.16.7",
+    "@babel/plugin-transform-object-assign": "^7.16.7",
+    "@babel/plugin-transform-runtime": "^7.17.0",
+    "@babel/preset-env": "^7.16.11",
+    "babel-cli": "^7.0.0-beta.3",
+    "babel-loader": "^8.2.3",
+    "babel-plugin-module-resolver": "2.7.1",
+    "babel-plugin-transform-define": "^2.0.1",
+    "babel-plugin-transform-es2015-destructuring": "6.23.0",
+    "cross-env": "^7.0.3",
+    "onchange": "^2.4.0",
+    "rimraf": "^3.0.2",
+    "terser-webpack-plugin": "^5.3.1",
+    "uglify-js": "^3.12.8",
+    "webpack": "^5.24.2",
+    "webpack-cli": "^4.6.0"
   }
 }
