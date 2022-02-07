@@ -3,13 +3,13 @@ define(function (require) {
 
 	var StreamEventTypes = require('./StreamEventTypes'),
 		StreamErrors = require('./StreamErrors'),
-		StreamConnector_WithDependencyInjection = require('./StreamConnector'),
+		StreamConnector = require('./StreamConnector_standalone'),
 		Subscription = require('./Subscription');
 
 	return {
 		StreamEventTypes: StreamEventTypes,	// Is this needed? Or could it be required/imported directly?
 		StreamErrors: StreamErrors,	// Is this needed? Or could it be required/imported directly?
-		StreamConnector: StreamConnector_WithDependencyInjection,
+		StreamConnector: StreamConnector,
 		Subscription: Subscription
 	}
 });

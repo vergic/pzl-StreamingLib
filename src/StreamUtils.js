@@ -1,8 +1,6 @@
 define(function (require) {
 	'use strict';
 
-	var Promise = require('es6-promise');
-
 	function wait(ms) {
 		return new Promise(function (r) {
 			return setTimeout(r, ms)
