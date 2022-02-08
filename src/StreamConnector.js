@@ -1,7 +1,7 @@
 define(['require'], function(require) {
 	'use strict';
 
-	var signalr = require('@microsoft/signalr/dist/browser/signalr'),
+	var signalr = require('@microsoft/signalr'),
 		StreamErrors = require('./StreamErrors'),
 		StreamUtils = require('./StreamUtils'),
 		StreamEventTypes = require('./StreamEventTypes');

@@ -1,13 +1,15 @@
 const path = require('path');
-const helpers = require('./webpack.helpers.js');
-const { IgnorePlugin } = require('webpack');
+const helpers = require('./webpack.helpers');
 
 module.exports = {
   mode: 'development',
-  entry: './src/VngageStream_standalone.js',
+  entry: {
+    'vngageStreamLib': './src/VngageStream_standalone.js',
+    'vngageStreamLib.deps': './src/VngageStream_deps.js',
+  },
   output: {
     path: path.resolve(__dirname, 'dist'),
-    filename: 'vngageStreamLib.js',
+    filename: '[name].js',
     library: 'vngageStreamLib',
     libraryTarget: 'umd',
     globalObject: 'this',
@@ -34,7 +36,6 @@ module.exports = {
             loader: 'babel-loader',
             options: {
               cacheDirectory: true,
-              presets: ['@babel/env']
             }
           }
         ],
@@ -43,23 +44,4 @@ module.exports = {
       },
     ]
   },
-  resolve: {
-    fallback: {
-      "buffer": false,
-      "url": false,
-      "util": false,
-      "https": false,
-      "http": false,
-    },
-  },
-  plugins: [
-    new IgnorePlugin({
-      // Ignore dependencies used in node.js only!
-      // Will make the bundle a lot smaller!
-      // Note: If this package is to be used in node.js, the pre-built bundles in /dist/ should probably *NOT* be used!
-      // Better to import e.g. "VngageStream_standalone" or "StreamConnector_standalone" directly from /src/
-      // (with newer node.js-versions, transpiling should not be needed)
-      resourceRegExp: /^(tough-cookie|node-fetch|fetch-cookie|abort-controller|eventsource)$/,
-    }),
-  ],
 };
