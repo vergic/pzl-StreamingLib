@@ -1,4 +1,3 @@
-const fs = require('fs');
 const path = require('path');
 
 // Helper-function for use in rule include to include specific node_modules in babel-loader (that need transpiling)

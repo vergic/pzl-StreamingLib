@@ -648,9 +648,10 @@ define(['require'], function(require) {
 
 
 	/*******************************************************************************************
-	 ** Init function to configure StreamConnector
+	 ** Init function to configure the StreamConnector
 	 *
-	 *   brokerUrl 		= URL to CommSrv broker endpoint (Note: Should include sessionId as query parameter!)
+	 *   brokerUrl 		= URL to CommSrv broker endpoint
+	 *   	Note: It should include sessionId as query parameter (will probably be re-designed in the future)
 	 *
 	 *   streamOptions	= Config object for signalR and related behavior
 	 *    	streamOptions.brokerTransport (optional, default 'WebSockets'):
@@ -667,9 +668,12 @@ define(['require'], function(require) {
 	 *		}
 	 *
 	 *	 dependencyLibs	= Object containing dependency libraries (for now, only 'machina')
-	 *	 	This library needs to be injected at runtime (Visitor already uses it, so we don't want to include it twice)
+	 *	 	The "machina" library needs to be injected at runtime (Visitor already uses it, so we don't want to bundle it twice)
+	 *		{
+	 * 			machina: <required "machina" npm-module>
+	 * 		}
 	 *
-	 *	 initDebug		= Optional object containing debug functions, e.g.
+	 *	 initDebug		= Optional object containing debug functions (default will be noop()), e.g.:
 	 *	 	{
 	 * 			log: function () { ... },
 	 * 			warn: function () { ... },

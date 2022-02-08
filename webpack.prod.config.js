@@ -34,7 +34,6 @@ module.exports = {
           {
             loader: 'babel-loader',
             options: {
-              babelrc: false,	// Babel-settings for transpiling "node_modules" should *NOT* use anything from .babelrc
               cacheDirectory: true,
               presets: ['@babel/env']
             }
@@ -56,12 +55,18 @@ module.exports = {
   },
   plugins: [
     new IgnorePlugin({
+      // Ignore dependencies used in node.js only!
+      // Will make the bundle a lot smaller!
+      // Note: If this package is to be used in node.js, the pre-built bundles in /dist/ should probably *NOT* be used!
+      // Better to import e.g. "VngageStream_standalone" or "StreamConnector_standalone" directly from /src/
+      // (with newer node.js-versions, transpiling should not be needed)
       resourceRegExp: /^(tough-cookie|node-fetch|fetch-cookie|abort-controller|eventsource)$/,
     }),
   ],
   optimization: {
     minimizer: [
       new TerserPlugin({
+        // Remove comments and license-file generation
         terserOptions: {
           format: {
             comments: false,
