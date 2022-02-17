@@ -5,7 +5,7 @@ const TerserPlugin = require('terser-webpack-plugin');
 module.exports = {
   mode: 'production',
   entry: {
-    'vngageStreamLib': './src/VngageStream_standalone.js',
+    'vngageStreamLib': './src/VngageStream.js',
     'vngageStreamLib.deps': './src/VngageStream_deps.js',
   },
   output: {

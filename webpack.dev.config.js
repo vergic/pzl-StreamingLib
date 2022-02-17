@@ -4,7 +4,7 @@ const helpers = require('./webpack.helpers');
 module.exports = {
   mode: 'development',
   entry: {
-    'vngageStreamLib': './src/VngageStream_standalone.js',
+    'vngageStreamLib': './src/VngageStream.js',
     'vngageStreamLib.deps': './src/VngageStream_deps.js',
   },
   output: {

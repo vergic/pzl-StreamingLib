@@ -1,4 +1,4 @@
-import StreamConnector from './StreamConnector_standalone';
+import StreamConnector from './StreamConnector';
 import StreamEventTypes from './StreamEventTypes';
 import StreamErrors from './StreamErrors';
 import Subscription from './Subscription';
