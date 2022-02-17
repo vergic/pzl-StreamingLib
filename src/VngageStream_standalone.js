@@ -1,15 +1,11 @@
-define(function (require) {
-	'use strict';
+import StreamConnector from './StreamConnector_standalone';
+import StreamEventTypes from './StreamEventTypes';
+import StreamErrors from './StreamErrors';
+import Subscription from './Subscription';
 
-	var StreamEventTypes = require('./StreamEventTypes'),
-		StreamErrors = require('./StreamErrors'),
-		StreamConnector = require('./StreamConnector_standalone'),
-		Subscription = require('./Subscription');
-
-	return {
-		StreamEventTypes: StreamEventTypes,	// Is this needed? Or could it be required/imported directly?
-		StreamErrors: StreamErrors,	// Is this needed? Or could it be required/imported directly?
-		StreamConnector: StreamConnector,
-		Subscription: Subscription
-	}
-});
+export default {
+	StreamEventTypes,	// Is this needed? Or could it be required/imported directly?
+	StreamErrors,	// Is this needed? Or could it be required/imported directly?
+	StreamConnector,
+	Subscription
+}

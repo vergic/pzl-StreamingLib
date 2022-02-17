@@ -2,25 +2,21 @@
 // It will add and init correct default properties for usage by StreamConnector
 // Add overridden and/or custom props as the arg to extend()
 
-define(function (require) {
-	'use strict';
+import {StreamUtils} from './StreamUtils';
 
-	var StreamUtils = require('./StreamUtils');
+const defaultSubscriptionProps = {
+	topic: '',
+	fromEventId: null,
+	subscribeInvocationId: -1,
+	subscriberRef: null,
+	lastReceivedEventId: -1,
+	onDataReceived: function() {},
+	onSubscriptionStart: null,
+	onSubscriptionEnd: null
+};
 
-	var defaultSubscriptionProps = {
-		topic: '',
-		fromEventId: null,
-		subscribeInvocationId: -1,
-		subscriberRef: null,
-		lastReceivedEventId: -1,
-		onDataReceived: function() {},
-		onSubscriptionStart: null,
-		onSubscriptionEnd: null
-	};
-
-	return {
-		extend: function (props) {
-			return StreamUtils.extend({}, defaultSubscriptionProps, props);
-		}
+export default {
+	extend: props => {
+		return StreamUtils.extend({}, defaultSubscriptionProps, props);
 	}
-});
+}

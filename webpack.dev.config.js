@@ -10,8 +10,11 @@ module.exports = {
   output: {
     path: path.resolve(__dirname, 'dist'),
     filename: '[name].js',
-    library: 'vngageStreamLib',
-    libraryTarget: 'umd',
+    library: {
+      name: 'vngageStreamLib',
+      type: 'umd',
+      export: 'default',
+    },
     globalObject: 'this',
     umdNamedDefine: true,
   },
