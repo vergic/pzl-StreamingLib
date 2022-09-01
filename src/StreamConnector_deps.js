@@ -198,6 +198,12 @@ function _connect() {
 			}
 	}
 
+	if (options.access_token) {
+		brokerConnectionOptions.accessTokenFactory = () => {
+			return options.access_token
+		}
+	}
+
 	var hubConnectionBuilder = new signalr.HubConnectionBuilder()
 		.withUrl(options.brokerUrl, brokerConnectionOptions)
 		.configureLogging(options.brokerLogLevel)
@@ -275,7 +281,7 @@ function connectToBroker() {
 }
 function disconnectFromBroker() {
 	return new Promise(function (resolve, reject) {
-		if (brokerConnection.state === 'disconnected') {
+		if (!brokerConnection || brokerConnection.state === 'disconnected') {
 			// Already disconnected. Resolve
 			resolve();
 		}
@@ -705,12 +711,14 @@ var init = function init(brokerUrl, streamOptions, eventHandlers, dependencyLibs
 
 	if (brokerUrl && brokerUrl !== options.brokerUrl ||
 		streamOptions.sessionId !== options.sessionId ||
+		streamOptions.access_token !== options.access_token ||
 		streamOptions.brokerTransport !== options.brokerTransport ||
 		streamOptions.brokerLogLevel !== options.brokerLogLevel)
 	{
 		debug = initDebug;
 		options.brokerUrl = brokerUrl;
 		options.sessionId = streamOptions.sessionId;
+		options.access_token = streamOptions.access_token;
 		options.brokerTransport = streamOptions.brokerTransport;
 		options.brokerLogLevel = streamOptions.brokerLogLevel;
 		options.streamingSubscribeOnly = streamOptions.streamingSubscribeOnly;
