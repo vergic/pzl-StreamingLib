@@ -3,10 +3,9 @@ import StreamEventTypes from './StreamEventTypes';
 import StreamErrors from './StreamErrors';
 import {Stream} from './Stream';
 import {StreamUtils} from './StreamUtils';
+import * as SubscriptionsStore from './SubscriptionsStore';
 
 const default_broker_version = 1;
-const default_topic_start_id = 1;
-
 const reconnectRetryDelay = 3;
 const resubscribeDelay = 1;
 const reconnectMaxRetries = 60; // 60 = 3 minutes if reconnectRetryDelay == 3
@@ -23,16 +22,14 @@ let debug = noDebug;
 
 const options = {
 	brokerVersion: default_broker_version,
-	topicStartId: default_topic_start_id,
+	publishMethod: 'Publish',
 	brokerUrl: null,
 	brokerTransport: 'WebSockets',
 	brokerLogLevel: 'none',
 	sessionId: null,
 }
 var brokerEventCallbacks = {};
-var subscriptions = {};
 var lastSubscribeInvocationId = 0;
-
 var brokerConnection = null;
 
 function initBrokerConnectionFsm(machina) {
@@ -321,25 +318,31 @@ function getConnection() {
  *******************************************************************************************/
 function addSubscription(subscription, timeout) {
 	debug.log('addSubscription:',subscription, timeout);
-	unsubscribeToTopic(subscription.topic);
-	subscriptions[subscription.topic] = subscription;
+	unsubscribe(subscription);
+	SubscriptionsStore.add(subscription);
 
 	// Subscribe to topic, skip retrying on failures (better to reject and let caller handle it)...
 	// If a "timeout" is specified, reject if it's taking too long...
 	if (timeout) {
-		return StreamUtils.promiseTimeout(getAndSubscribeToTopic(subscription.topic), timeout);
+		return StreamUtils.promiseTimeout(getAndStreamSubscription(subscription), timeout);
 	} else {
-		return getAndSubscribeToTopic(subscription.topic);
+		return getAndStreamSubscription(subscription);
 	}
 }
-function removeTopicSubscription(topic) {
-	debug.log('removeTopicSubscription:',topic);
-	if (subscriptions[topic]) {
-		unsubscribeToTopic(topic);
-		delete subscriptions[topic];
+function removeSubscription(subscription) {
+	// Can either take a subscription object, or a subscriptionId (returned from Subscription.getSubscriptionId())
+	debug.log('removeSubscription:',subscription);
+
+	if (typeof subscription === 'string') {
+		subscription = SubscriptionsStore.findById(subscription);
 	}
 
-	if (StreamUtils.isEmpty(subscriptions)) {
+	if (subscription) {
+		unsubscribe(subscription);
+		SubscriptionsStore.remove(subscription);
+	}
+
+	if (SubscriptionsStore.getAll().length < 1) {
 		// No more active subscriptions - disconnect from broker
 		debug.log('No more subscriptions - disconnecting from broker');
 		disconnectFromBroker();
@@ -347,21 +350,18 @@ function removeTopicSubscription(topic) {
 }
 function reSubscribeAll() {
 	var subscribePromises = [];
-	Object.keys(subscriptions).forEach(function (topic) {
-		debug.log('reSubscribeAll: Re-subscribing to topic: ', topic);
-
-		subscribePromises.push(getAndSubscribeToTopic(topic, true).catch(function (err) {
-			// Catch any errors from _getAndSubscribeToTopic() to prevent Promise.all() below to "fail-fast" on errors...
-			debug.warn('reSubscribeAll: Error re-subscribing to topic: "'+topic+'"',err);
+	SubscriptionsStore.getAll().forEach(subscription => {
+		debug.log('reSubscribeAll: Re-subscribing to subscription: ', subscription);
+		subscribePromises.push(getAndStreamSubscription(subscription, true).catch(err => {
+			// Catch any errors from _getAndStreamSubscription() to prevent Promise.all() below to "fail-fast" on errors...
+			debug.warn('reSubscribeAll: Error re-subscribing to subscription: "' + subscription + '"', err);
 		}));
 	});
 	return Promise.all(subscribePromises);
 }
 function unSubscribeAll() {
 	// Unsubscribe any active subscription...
-	Object.keys(subscriptions).forEach(function (topic) {
-		unsubscribeToTopic(topic);
-	});
+	SubscriptionsStore.getAll().forEach(unsubscribe);
 }
 
 
@@ -371,11 +371,11 @@ function unSubscribeAll() {
 /*******************************************************************************************
  ** Functions for getting and subscribing/unsubscribing to any topic
  *******************************************************************************************/
-function getTopic(connection, topic, fromId) {
+function getTopic(connection, subscription, fromId) {
 	// debug.log('getTopic:', topic, 'from:', fromId);
 	var resultArray = [];
 	return new Promise(function (resolve, reject) {
-		Stream.get(connection, topic, fromId, options)
+		Stream.get(connection, subscription, fromId, options)
 			.subscribe({
 				next: function(event) {
 					// debug.log('getTopic Get stream next:', event);
@@ -393,87 +393,91 @@ function getTopic(connection, topic, fromId) {
 					} else {
 						// Other error from hub, try to "connection.invoke()" instead of "connection.stream()" for backwards compatibility with legacy CommSrv (.NET Core 2)
 						debug.log('getTopic(): Retrying with connection.invoke(\'Get\', topic, fromId)');
-						Stream.getInvoke(connection, topic, fromId, options).then(resolve, reject);
+						Stream.getInvoke(connection, subscription, fromId, options).then(resolve, (err) => {
+							subscription.onSubscriptionError && subscription.onSubscriptionError(err);
+							reject(err);
+						});
 					}
 				}
 			});
 	});
 }
-function getAndSubscribeToTopic(topic, keepRetrying) {
+function getAndStreamSubscription(subscription, keepRetrying) {
 	if (keepRetrying) {
-		return StreamUtils.retryPromiseFunc(_getAndSubscribeToTopic.bind(null, topic), resubscribeDelay * 1000, reconnectMaxRetries, 'abort');
+		return StreamUtils.retryPromiseFunc(_getAndStreamSubscription.bind(null, subscription), resubscribeDelay * 1000, reconnectMaxRetries, 'abort');
 	} else {
-		return _getAndSubscribeToTopic(topic);
+		return _getAndStreamSubscription(subscription);
 	}
 }
-function _getAndSubscribeToTopic(topic) {
-	debug.log('_getAndSubscribeToTopic:', topic);
+function _getAndStreamSubscription(subscription) {
+	debug.log('_getAndStreamSubscription:', subscription);
 
 	return new Promise(function (resolve, reject) {
 
 		// Unsubscribe if already subscribing...
-		unsubscribeToTopic(topic);
+		unsubscribe(subscription);
 
-		var subscription = subscriptions[topic];
+		subscription = SubscriptionsStore.get(subscription);
 		if (!subscription) {
 			return reject('abort');	// Reject with reason 'abort' to skip retrying...
 		}
 
-		// Track invocations to _getAndSubscribeToTopic() by subscription.subscribeInvocationId
+		// Track invocations to _getAndStreamSubscription() by subscription.subscribeInvocationId
 		var currentSubscribeInvocationId = ++lastSubscribeInvocationId;
 		subscription.subscribeInvocationId = currentSubscribeInvocationId;
-		debug.log('_getAndSubscribeToTopic currentSubscribeInvocationId:', currentSubscribeInvocationId);
+		debug.log('_getAndStreamSubscription currentSubscribeInvocationId:', currentSubscribeInvocationId);
 
 		getConnection().then(function (connection) {
-			debug.log('_getAndSubscribeToTopic: gotConnection:', connection);
+			debug.log('_getAndStreamSubscription: gotConnection:', connection);
 
-			// Important: Look up the subscription for this topic again - it may have changed while waiting for connection!
-			subscription = subscriptions[topic];
+			// Important: Look up the subscription again - it may have changed while waiting for connection!
+			subscription = SubscriptionsStore.get(subscription);
 			if (subscription.subscribeInvocationId !== currentSubscribeInvocationId) {
-				debug.log('_getAndSubscribeToTopic: A newer subscription to this topic has been invoked while waiting for connection - abort this one...');
+				debug.log('_getAndStreamSubscription: A newer subscription has been invoked while waiting for connection - abort this one...');
 				return reject('abort');	// Reject with reason 'abort' to skip retrying...
 			}
 			if (subscription.subscriberRef) {
-				// Stop any existing subscription on this topic if exists (should not happen, as we have already called unsubscribeToTopic() before connecting, and if we get here we should be in the same invocation)
-				unsubscribeToTopic(topic);
+				// Stop any existing subscription if exists (should not happen, as we have already called unsubscribe() before connecting, and if we get here we should be in the same invocation)
+				unsubscribe(subscription);
 			}
 
-			var getFullTopicState = (subscription.lastReceivedEventId < 0  && (typeof subscription.fromEventId !== 'number' || subscription.fromEventId === options.topicStartId)); // No events received yet, and no "fromEventId" specified (different from "topicStartId") => We want the full topic state!
-			var fromEventId = (getFullTopicState ? options.topicStartId : (subscription.lastReceivedEventId >= 0 ? subscription.lastReceivedEventId + 1 : subscription.fromEventId));
+			var getFullTopicState = (subscription.lastReceivedEventId < 0  && (typeof subscription.fromEventId !== 'number' || subscription.fromEventId === subscription.options.topicStartEventId)); // No events received yet, and no "fromEventId" specified (different from "topicStartEventId") => We want the full topic state!
+			var fromEventId = (getFullTopicState ? subscription.options.topicStartEventId : (subscription.lastReceivedEventId >= 0 ? subscription.lastReceivedEventId + 1 : subscription.fromEventId));
 			var getTopicPromise;
 			if (options.streamingSubscribeOnly) {
 				getTopicPromise = Promise.resolve([]);
 			} else {
-				debug.log('_getAndSubscribeToTopic: \'Get\' topic: ', topic, ' from: ', fromEventId, 'invocationId:', currentSubscribeInvocationId);
-				getTopicPromise = getTopic(connection, subscription.topic, fromEventId);
+				debug.log('_getAndStreamSubscription: \'Get\': ', subscription, ' from: ', fromEventId, 'invocationId:', currentSubscribeInvocationId);
+				getTopicPromise = getTopic(connection, subscription, fromEventId);
 			}
 
 			getTopicPromise.then(function(eventsArray) {
 
 				// Important: Look up the subscription for this topic again - it may have changed while waiting for connection!
-				subscription = subscriptions[topic];
+				subscription = SubscriptionsStore.get(subscription);
 				if (subscription.subscribeInvocationId !== currentSubscribeInvocationId) {
-					debug.log('_getAndSubscribeToTopic: A newer subscription to this topic has been invoked while waiting for getTopic() - abort this one...');
+					debug.log('_getAndStreamSubscription: A newer subscription to this topic has been invoked while waiting for getTopic() - abort this one...');
 					return reject('abort');	// Reject with reason 'abort' to skip retrying...
 				}
 
 				if (eventsArray && Array.isArray(eventsArray) && eventsArray.length) {
 					// Handle events from broker 'Get' (if any exists)
-					debug.log('_getAndSubscribeToTopic: Got topic eventsArray:', eventsArray, 'invocationId:', currentSubscribeInvocationId);
+					debug.log('_getAndStreamSubscription: Got topic eventsArray:', eventsArray, 'invocationId:', currentSubscribeInvocationId);
 
 					try {
 						// Filter eventsArray to remove duplicates (which is a recoverable error condition)
 						// Or throw a StreamErrors.TOPIC_STREAM_OUT_OF_ORDER if expected event(s) are missing (which is an unrecoverable error)
 						eventsArray = eventsArray.filter(function (event) {
-							if (event.id < subscription.lastReceivedEventId + 1) {
-								debug.error('Error: Broker event id in response-array from \'Get\' out of order (old event received). Expected ' + (subscription.lastReceivedEventId + 1) + ', received ' + event.id, event, 'invocationId:', currentSubscribeInvocationId);
+							const eventId = event[subscription.options.eventIdProperty];
+							if (eventId < subscription.lastReceivedEventId + 1) {
+								debug.error('Error: Broker event id in response-array from \'Get\' out of order (old event received). Expected ' + (subscription.lastReceivedEventId + 1) + ', received ' + eventId, event, 'invocationId:', currentSubscribeInvocationId);
 								debug.log('Skipping event...');
 								return false;	// return false to skip by filter
-							} else if (subscription.lastReceivedEventId != -1 && event.id > subscription.lastReceivedEventId + 1) {
-								debug.error('Error: Broker event id in response-array from \'Get\' out of order (gap - event(s) missing). Expected ' + (subscription.lastReceivedEventId + 1) + ', received ' + event.id, event, 'invocationId:', currentSubscribeInvocationId);
+							} else if (subscription.lastReceivedEventId != -1 && eventId > subscription.lastReceivedEventId + 1) {
+								debug.error('Error: Broker event id in response-array from \'Get\' out of order (gap - event(s) missing). Expected ' + (subscription.lastReceivedEventId + 1) + ', received ' + eventId, event, 'invocationId:', currentSubscribeInvocationId);
 								throw StreamErrors.TOPIC_STREAM_OUT_OF_ORDER;	// throw exception to abort (unrecoverable error)
 							}
-							subscription.lastReceivedEventId = event.id;
+							subscription.lastReceivedEventId = eventId;
 							return true;	// All ok, return true to include event
 						});
 
@@ -487,113 +491,92 @@ function _getAndSubscribeToTopic(topic) {
 						} else {
 							debug.log('Unknown error:',e);
 						}
-						getAndSubscribeToTopic(topic).then(resolve, reject); // Try to resubscribe, but skip retrying on failures...
+						getAndStreamSubscription(subscription).then(resolve, reject); // Try to resubscribe, but skip retrying on failures... Warning: Does not work!!! This loops forever if getAndStreamSubscription() constantly fails!
 						return;
 					}
 					fromEventId = subscription.lastReceivedEventId + 1;
 				}
 
 				try {
-					debug.log('_getAndSubscribeToTopic: \'Subscribe\' to topic: ', topic, ' from id: ', fromEventId, 'invocationId:', currentSubscribeInvocationId);
+					debug.log('_getAndStreamSubscription: \'Subscribe\': ', subscription, ' from id: ', fromEventId, 'invocationId:', currentSubscribeInvocationId);
 
-					subscription.subscriberRef = Stream.subscribe(connection, topic, fromEventId, options)
+					subscription.subscriberRef = Stream.stream(connection, subscription, fromEventId, options)
 					// subscription.subscriberRef = connection.stream('Subscribe', '1'+topic, fromEventId) // Test invalid topic
 						.subscribe({
 							next: function(event) {
 								// Handle events from broker 'Subscribe'
-								if (event.id < subscription.lastReceivedEventId + 1) {
-									debug.error('Error: Broker event id in \'Subscribe\'-stream out of order (old event received). Expected ' + (subscription.lastReceivedEventId + 1) + ', received ' + event.id, event, 'invocationId:', currentSubscribeInvocationId);
+								const eventId = event[subscription.options.eventIdProperty];
+								if (eventId < subscription.lastReceivedEventId + 1) {
+									debug.error('Error: Broker event id in \'Subscribe\'-stream out of order (old event received). Expected ' + (subscription.lastReceivedEventId + 1) + ', received ' + eventId, event, 'invocationId:', currentSubscribeInvocationId);
 									debug.log('Skipping event...');
-									return;
-								} else if (subscription.lastReceivedEventId != -1 && event.id > subscription.lastReceivedEventId + 1) {
-									debug.error('Error: Broker event id in \'Subscribe\'-stream out of order: (gap - event(s) missing). Expected ' + (subscription.lastReceivedEventId + 1) + ', received ' + event.id, event, 'invocationId:', currentSubscribeInvocationId);
+								} else if (subscription.lastReceivedEventId != -1 && eventId > subscription.lastReceivedEventId + 1) {
+									debug.error('Error: Broker event id in \'Subscribe\'-stream out of order: (gap - event(s) missing). Expected ' + (subscription.lastReceivedEventId + 1) + ', received ' + eventId, event, 'invocationId:', currentSubscribeInvocationId);
 									debug.log('Re-subscribing to topic...');
-									getAndSubscribeToTopic(topic, true).catch(function (err) {
+									getAndStreamSubscription(subscription, true).catch(function (err) {
 										debug.log('Error resubscribing to topic (subscribe, stream out of order, gap)', err);
 									});
-									return;
+								} else {
+									const preparedEventsData = _prepareEventsData(event, StreamEventTypes.STREAM, 'invocationId: ' + currentSubscribeInvocationId);
+									subscription.onDataReceived(preparedEventsData.eventsArray, preparedEventsData.receivedAs);
+									subscription.lastReceivedEventId = eventId;
 								}
-
-								var preparedEventsData = _prepareEventsData(event, StreamEventTypes.STREAM, 'invocationId: ' + currentSubscribeInvocationId);
-								subscription.onDataReceived(preparedEventsData.eventsArray, preparedEventsData.receivedAs);
-								subscription.lastReceivedEventId = event.id;
 							},
 							complete: function () {
-								debug.log('Stream completed on topic "' + topic + '"', 'invocationId:', currentSubscribeInvocationId);
+								debug.log('Stream completed on "' + subscription + '"', 'invocationId:', currentSubscribeInvocationId);
+								subscription.onSubscriptionStreamComplete && subscription.onSubscriptionStreamComplete();
 							},
 							error: function (err) {
-								debug.error('Stream error on topic "' + topic + '":', err, connection, connection.connectionState, 'invocationId:', currentSubscribeInvocationId);
-/*
-								if (useSignalRv3) {
-									// SignalRv3 detected: Do nothing (let auto-reconnect take care of the business)
-									// TODO: SOME stream errors should be handled here on signalr v3, e.g. "slow consumer", etc
-*/
-									debug.log('SignalR v3: Do nothing (let auto-reconnect take care of business)');
-/*
-									return;
-								}
-								debug.log('Re-subscribing...');
-								setTimeout(function() {
-									getAndSubscribeToTopic(topic, true).catch(function (err) {
-										debug.log('Error resubscribing to topic (subscribe, error)', err, connection, connection.connectionState);
-									});
-								}, resubscribeDelay * 1000);
-*/
+								debug.error('Stream error on "' + subscription + '":', err, connection, connection.connectionState, 'invocationId:', currentSubscribeInvocationId);
+								subscription.onSubscriptionError && subscription.onSubscriptionError(err);
 							}
 						});
 
 					// After successful subscription: Call onSubscriptionStart()-hook in the subscription, if it exists
-					if (subscription.onSubscriptionStart) {
-						subscription.onSubscriptionStart();
-					}
+					subscription.onSubscriptionStart && subscription.onSubscriptionStart();
 
 					resolve(subscription.subscriberRef);
 				} catch (err) {
-					debug.error('Exception subscribing to topic "' + topic + '":', err, 'invocationId:', currentSubscribeInvocationId, connection, connection.connectionState);
+					debug.error('Exception subscribing to topic "' + subscription + '":', err, 'invocationId:', currentSubscribeInvocationId, connection, connection.connectionState);
 					reject({
 						errorCode: StreamErrors.TOPIC_SUBSCRIBE_ERROR,
-						errorMessage: 'Error subscribing to topic: '+ topic,
+						errorMessage: 'Error subscribing to topic: '+ subscription,
 						err: err
 					});
 				}
 			}).catch(function (err) {
 				// getTopic() rejected or unrecoverable reSubscribe from eventsArray array out of order
-				debug.error('_getAndSubscribeToTopic: Exception from getTopic("' + subscription.topic + '"):', err, 'invocationId:', currentSubscribeInvocationId, connection, connection.connectionState);
+				debug.error('_getAndStreamSubscription: Exception from getTopic("' + subscription + '"):', err, 'invocationId:', currentSubscribeInvocationId, connection, connection.connectionState);
 				reject({
 					errorCode: StreamErrors.TOPIC_GET_ERROR,
-					errorMessage: 'Error getting topic: '+ subscription.topic,
+					errorMessage: 'Error getting topic: '+ subscription,
 					err: err
 				});
 			});
 		}, function (err) {
-			debug.error('_getAndSubscribeToTopic: Exception from getConnection("' + subscription.topic + '"):', err, 'invocationId:', currentSubscribeInvocationId);
+			debug.error('_getAndStreamSubscription: Exception from getConnection("' + subscription + '"):', err, 'invocationId:', currentSubscribeInvocationId);
 			reject({
 				errorCode: StreamErrors.BROKER_CONNECT_ERROR,
-				errorMessage: 'Could not connect to broker (from _getAndSubscribeToTopic)',
+				errorMessage: 'Could not connect to broker (from _getAndStreamSubscription)',
 				err: err
 			});
 		});
 	});
 }
-function unsubscribeToTopic(topic) {
-	var subscription = subscriptions[topic];
-	if (subscription) {
-		if (subscription.subscriberRef) {
-			debug.log('unsubscribeToTopic:', topic);
+function unsubscribe(subscription) {
+	if (subscription && subscription.subscriberRef) {
 
-			// Before unsubscribing an active subscription: Call onSubscriptionEnd()-hooks in the subscription, if it exists
-			if (subscription.onSubscriptionEnd) {
-				subscription.onSubscriptionEnd();
-			}
-
-			try {
-				subscription.subscriberRef.dispose();
-				debug.log('topic subscriber disposed');
-			} catch (e) {
-				debug.log('Exception disposing topic subscriber:',e);
-			}
-			subscription.subscriberRef = null;
+		// Before unsubscribing an active subscription: Call onSubscriptionEnd()-hooks in the subscription, if it exists
+		if (subscription.onSubscriptionEnd) {
+			subscription.onSubscriptionEnd();
 		}
+
+		try {
+			subscription.subscriberRef.dispose();
+			debug.log('topic subscriber disposed');
+		} catch (e) {
+			debug.log('Exception disposing topic subscriber:',e);
+		}
+		subscription.subscriberRef = null;
 	}
 }
 function publishTopicWhenConnected(topic, data) {
@@ -615,7 +598,7 @@ function publishTopicIfConnected(topic, data) {
 
 
 function getSubscriptions() {
-	return subscriptions;
+	return SubscriptionsStore.getAll();
 }
 
 
@@ -636,7 +619,9 @@ function _prepareEventsData(events, receivedAs, extraLoggingArg) {
 	// Assemble debug data...
 	var debugData = [];
 	if (receivedAs === StreamEventTypes.STREAM) {
-		debugData.push('conversationData STREAM-event:', events.data.type + (events.data.type === 'conversationMessage' ? ' ('+events.data.messageType+')' : ''));
+		const eventType = (events.data && events.data.type || events.type);
+		const messageType = (events.data && events.data.messageType || events.messageType);
+		debugData.push('conversationData STREAM-event:', eventType + (eventType === 'conversationMessage' ? ' ('+messageType+')' : ''));
 	} else if (receivedAs === StreamEventTypes.STREAMED_CHUNK) {
 		debugData.push('conversationData STREAMED_CHUNK-array:');
 	} else if (receivedAs === StreamEventTypes.STATE) {
@@ -704,9 +689,6 @@ var init = function init(brokerUrl, streamOptions, eventHandlers, dependencyLibs
 	if (typeof streamOptions.brokerVersion === 'number') {
 		options.brokerVersion = parseInt(streamOptions.brokerVersion, 10);
 	}
-	if (typeof streamOptions.topicStartId === 'number') {
-		options.topicStartId = parseInt(streamOptions.topicStartId, 10);
-	}
 
 
 	if (brokerUrl && brokerUrl !== options.brokerUrl ||
@@ -744,6 +726,6 @@ export default {
 	init: init,
 	getSubscriptions: getSubscriptions,
 	addSubscription: addSubscription,
-	removeTopicSubscription: removeTopicSubscription,
+	removeSubscription: removeSubscription,
 	publishTopicIfConnected: publishTopicIfConnected
 }

@@ -1,5 +1,6 @@
-const get = (connection, topic, fromId, options) => {
-    const args = ['Get'];
+const get = (connection, subscription, fromId, options) => {
+    const args = [subscription.options.getMethod || 'Get'];
+    const topic = subscription[subscription.options.topicProperty];
     if (options.brokerVersion === 2) {
         args.push({
             sessionId: options.sessionId,
@@ -8,12 +9,10 @@ const get = (connection, topic, fromId, options) => {
         });
     } else if (options.brokerVersion === 3) {
         args.push({
-            id: topic,
-            skip: fromId,
-            take: 10000,
-            stream: false,
-            reverse: false,
-            visibleInTenant: false
+            type: subscription.options.type,
+            [subscription.options.topicProperty]: subscription[subscription.options.topicProperty],
+            skip: Math.max(0, fromId - 1),
+            take: 100000,
         });
     } else {
         args.push(...[topic, fromId]);
@@ -21,33 +20,37 @@ const get = (connection, topic, fromId, options) => {
     return connection.stream(...args);
 }
 
-const getInvoke = (connection, topic, fromId, options) => {
+const getInvoke = (connection, subscription, fromId, options) => {
     // NOTE: Used only for backwards compatibility with older CommSrv versions (broker<v1)
     // For newer CommSrv versions (broker >= v1), the regular get() is to be used...
-    const args = ['Get'];
-    if (options.brokerVersion === 2) {
-        args.push({
-            sessionId: options.sessionId,
-            topic: topic,
-            fromId: fromId
-        })
-    } else if (options.brokerVersion === 3) {
-        args.push({
-            id: topic,
-            skip: fromId,
-            take: 10000,
-            stream: false,
-            reverse: false,
-            visibleInTenant: false
-        });
+    if (options.brokerVersion > 1) {
+        return Promise.reject('getInvoke not supported in broker version');
     } else {
+        const args = [subscription.options.getMethod || 'Get'];
+        const topic = subscription[subscription.options.topicProperty];
         args.push(...[topic, fromId]);
+        return connection.invoke(...args);
     }
-    return connection.invoke(...args);
 }
 
-const subscribe = (connection, topic, fromId, options) => {
-    const args = ['Get'];
+const getReverse = (connection, subscription, fromId, options) => {
+    if (options.brokerVersion !== 3) {
+        return Promise.reject('getReverse not supported in broker version');
+    } else {
+        const args = [subscription.options.getReverseMethod || 'GetReverse'];
+        args.push({
+            type: subscription.options.type,
+            [subscription.options.topicProperty]: subscription[subscription.options.topicProperty],
+            skip: Math.max(0, fromId - 1),
+            take: 100000,
+        });
+        return connection.stream(...args);
+    }
+}
+
+const stream = (connection, subscription, fromId, options) => {
+    const args = [subscription.options.streamMethod || 'Subscribe'];
+    const topic = subscription[subscription.options.topicProperty];
     if (options.brokerVersion === 2) {
         args.push({
             sessionId: options.sessionId,
@@ -56,12 +59,10 @@ const subscribe = (connection, topic, fromId, options) => {
         });
     } else if (options.brokerVersion === 3) {
         args.push({
-            id: topic,
-            skip: fromId,
-            take: 10000,
-            stream: true,
-            reverse: false,
-            visibleInTenant: false
+            type: subscription.options.type,
+            [subscription.options.topicProperty]: subscription[subscription.options.topicProperty],
+            skip: Math.max(0, fromId - 1),
+            take: 100000,
         })
     } else {
         args.push(...[topic, fromId]);
@@ -70,7 +71,7 @@ const subscribe = (connection, topic, fromId, options) => {
 }
 
 const publish = (connection, topic, data, options) => {
-    const args = ['Publish'];
+    const args = [options.publishMethod || 'Publish'];
     if (options.brokerVersion === 1) {
         args.push(...[topic, data]);
     } else {
@@ -86,6 +87,7 @@ const publish = (connection, topic, data, options) => {
 export const Stream = {
     get,
     getInvoke,
-    subscribe,
+    getReverse,
+    stream,
     publish
 };

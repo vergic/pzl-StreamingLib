@@ -21,6 +21,6 @@ export default {
 	},
 	getSubscriptions: StreamConnector.getSubscriptions,
 	addSubscription: StreamConnector.addSubscription,
-	removeTopicSubscription: StreamConnector.removeTopicSubscription,
+	removeSubscription: StreamConnector.removeSubscription,
 	publishTopicIfConnected: StreamConnector.publishTopicIfConnected
 }

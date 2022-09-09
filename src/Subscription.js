@@ -5,6 +5,15 @@
 import {StreamUtils} from './StreamUtils';
 
 const defaultSubscriptionProps = {
+	// options added to support broker v3
+	options: {
+		topicProperty: 'topic',
+		topicStartEventId: 1,
+		eventIdProperty: 'id',
+		getMethod: 'Get',
+		streamMethod: 'Subscribe',
+	},
+
 	topic: '',
 	fromEventId: null,
 	subscribeInvocationId: -1,
@@ -12,11 +21,23 @@ const defaultSubscriptionProps = {
 	lastReceivedEventId: -1,
 	onDataReceived: function() {},
 	onSubscriptionStart: null,
-	onSubscriptionEnd: null
+	onSubscriptionEnd: null,
+
+	getSubscriptionId: function () {
+		// Should generate a string that uniquely identifies this subscription/stream
+		// Note: Two subscriptions for the same stream should result in the same "id" so we can compare and identify the same stream!!
+		return this[this.options.topicProperty];
+	},
+	toString: function () {
+		return this.getSubscriptionId();
+	}
+};
+
+const subscriptionFactory = props => {
+	return StreamUtils.extend(true, {}, defaultSubscriptionProps, props); // Deep merge...
 };
 
 export default {
-	extend: props => {
-		return StreamUtils.extend({}, defaultSubscriptionProps, props);
-	}
+	create: subscriptionFactory,
+	extend: subscriptionFactory
 }

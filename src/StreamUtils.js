@@ -43,21 +43,12 @@ export const isEmpty = (obj) => {
 
 // From: https://gomakethings.com/merging-objects-with-vanilla-javascript/
 const extend = (...args) => {
+    const extended = {};
+    let deep = false;
 
-    // Variables
-    var extended = {};
-    var deep = false;
-    var i = 0;
-
-    // Check if a deep merge
-    if (typeof (args[0]) === 'boolean') {
-        deep = args[0];
-        i++;
-    }
-
-    // Merge the object into the extended object
-    var merge = function (obj) {
-        for (var prop in obj) {
+    // Merge obj into extended
+    const merge = obj => {
+        for (const prop in obj) {
             if (obj.hasOwnProperty(prop)) {
                 if (deep && Object.prototype.toString.call(obj[prop]) === '[object Object]') {
                     // If we're doing a deep merge and the property is an object
@@ -70,10 +61,14 @@ const extend = (...args) => {
         }
     };
 
-    // Loop through each object and conduct a merge
-    for (; i < args.length; i++) {
-        merge(args[i]);
-    }
+    args.forEach((arg, i) => {
+        if (i === 0 && typeof (arg) === 'boolean') {
+            // First arg controls "deep merge" if its type is boolean
+            deep = arg;
+        } else {
+            merge(arg);
+        }
+    })
 
     return extended;
 };
