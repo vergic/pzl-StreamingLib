@@ -1,9 +1,9 @@
 {
   "name": "vngage-StreamLib",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "description": "Internal Streaming library for Vergic/vngage",
   "license": "UNLICENSED",
-  "main": "src/VngageStream.js",
+  "main": "dist/VngageStreamDist.js",
   "engines": {
     "node": ">=0.10.24"
   },
