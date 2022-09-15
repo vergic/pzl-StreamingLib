@@ -1,9 +1,9 @@
 {
-  "name": "vngage-StreamLib",
-  "version": "1.2.3",
-  "description": "Internal Streaming library for Vergic/vngage",
+  "name": "pzlStreamLib",
+  "version": "1.2.4",
+  "description": "Internal Streaming library for Puzzel",
   "license": "UNLICENSED",
-  "main": "dist/vngageStreamLib.js",
+  "main": "src/vngageStream.js",
   "engines": {
     "node": ">=0.10.24"
   },
@@ -15,35 +15,35 @@
     "watch": "onchange \"src/**/*.js\" -- npm run build:dev"
   },
   "dependencies": {
-    "@babel/runtime": "^7.17.0",
-    "@microsoft/signalr": "^6.0.1",
+    "@babel/runtime": "^7.19.0",
+    "@microsoft/signalr": "^6.0.9",
     "buffer": "^6.0.3",
-    "eventsource": "^1.0.7",
+    "eventsource": "^1.1.2",
     "https-browserify": "^1.0.0",
     "machina": "^4.0.2",
     "net": "^1.0.2",
     "stream-http": "^3.2.0",
     "url": "^0.11.0",
-    "util": "^0.12.3"
+    "util": "^0.12.4"
   },
   "devDependencies": {
-    "@babel/core": "^7.17.0",
-    "@babel/plugin-proposal-export-default-from": "^7.16.7",
-    "@babel/plugin-proposal-object-rest-spread": "^7.16.7",
-    "@babel/plugin-transform-object-assign": "^7.16.7",
-    "@babel/plugin-transform-runtime": "^7.17.0",
-    "@babel/preset-env": "^7.16.11",
+    "@babel/core": "^7.19.1",
+    "@babel/plugin-proposal-export-default-from": "^7.18.10",
+    "@babel/plugin-proposal-object-rest-spread": "^7.18.9",
+    "@babel/plugin-transform-object-assign": "^7.18.6",
+    "@babel/plugin-transform-runtime": "^7.19.1",
+    "@babel/preset-env": "^7.19.1",
     "babel-cli": "^7.0.0-beta.3",
-    "babel-loader": "^8.2.3",
+    "babel-loader": "^8.2.5",
     "babel-plugin-module-resolver": "2.7.1",
     "babel-plugin-transform-define": "^2.0.1",
-    "babel-plugin-transform-es2015-destructuring": "6.23.0",
+    "babel-plugin-transform-es2015-destructuring": "^6.23.0",
     "cross-env": "^7.0.3",
     "onchange": "^2.4.0",
     "rimraf": "^3.0.2",
-    "terser-webpack-plugin": "^5.3.1",
-    "uglify-js": "^3.12.8",
-    "webpack": "^5.24.2",
-    "webpack-cli": "^4.6.0"
+    "terser-webpack-plugin": "^5.3.6",
+    "uglify-js": "^3.17.0",
+    "webpack": "^5.74.0",
+    "webpack-cli": "^4.10.0"
   }
 }
