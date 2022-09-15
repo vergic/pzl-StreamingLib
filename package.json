@@ -1,6 +1,6 @@
 {
   "name": "pzlStreamLib",
-  "version": "1.2.4",
+  "version": "1.2.5",
   "description": "Internal Streaming library for Puzzel",
   "license": "UNLICENSED",
   "main": "src/vngageStream.js",

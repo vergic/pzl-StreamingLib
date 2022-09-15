@@ -4,14 +4,14 @@ const helpers = require('./webpack.helpers');
 module.exports = {
   mode: 'development',
   entry: {
-    'vngageStreamLib': './src/VngageStream.js',
-    'vngageStreamLib.deps': './src/VngageStream_deps.js',
+    'pzlStreamLib': './src/VngageStream.js',
+    'pzlStreamLib.deps': './src/VngageStream_deps.js',
   },
   output: {
     path: path.resolve(__dirname, 'dist'),
     filename: '[name].js',
     library: {
-      name: 'vngageStreamLib',
+      name: 'pzlStreamLib',
       type: 'umd',
       export: 'default',
     },
