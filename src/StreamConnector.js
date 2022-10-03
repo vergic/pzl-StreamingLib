@@ -386,7 +386,7 @@ function _getAndStreamSubscription(subscription) {
                 }
             }).catch(function (err) {
                 // getTopic() rejected or unrecoverable reSubscribe from eventsArray array out of order
-                debug.error('_getAndStreamSubscription: Exception from getTopic("' + subscription + '"):', err, 'invocationId:', currentSubscribeInvocationId, connection, connection?.connectionState);
+                debug.error('_getAndStreamSubscription: Exception from getTopic("' + subscription + '"):', err, 'invocationId:', currentSubscribeInvocationId, connection, connection && connection.connectionState);
                 reject({
                     errorCode: StreamErrors.TOPIC_GET_ERROR,
                     errorMessage: 'Error getting topic: ' + subscription,
