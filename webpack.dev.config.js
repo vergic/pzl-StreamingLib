@@ -4,8 +4,7 @@ const helpers = require('./webpack.helpers');
 module.exports = {
   mode: 'development',
   entry: {
-    'pzlStreamLib': './src/VngageStream.js',
-    'pzlStreamLib.deps': './src/VngageStream_deps.js',
+    'pzlStreamLib': './src/PzlStream.js',
   },
   output: {
     path: path.resolve(__dirname, 'dist'),

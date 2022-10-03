@@ -2,7 +2,7 @@
 // It will add and init correct default properties for usage by StreamConnector
 // Add overridden and/or custom props as the arg to extend()
 
-import {StreamUtils} from './StreamUtils';
+import { extend } from './StreamUtils';
 
 const defaultSubscriptionProps = {
 	// options added to support broker v3
@@ -34,7 +34,7 @@ const defaultSubscriptionProps = {
 };
 
 const subscriptionFactory = props => {
-	return StreamUtils.extend(true, {}, defaultSubscriptionProps, props); // Deep merge...
+	return extend(true, {}, defaultSubscriptionProps, props); // Deep merge...
 };
 
 export default {

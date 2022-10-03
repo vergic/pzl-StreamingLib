@@ -5,8 +5,7 @@ const TerserPlugin = require('terser-webpack-plugin');
 module.exports = {
   mode: 'production',
   entry: {
-    'pzlStreamLib': './src/VngageStream.js',
-    'pzlStreamLib.deps': './src/VngageStream_deps.js',
+    'pzlStreamLib': './src/PzlStream.js',
   },
   output: {
     path: path.resolve(__dirname, 'dist'),

@@ -32,17 +32,8 @@ export const promiseTimeout = (promise, ms) => {
     ])
 }
 
-export const isEmpty = (obj) => {
-    for (var prop in obj) {
-        if (obj.hasOwnProperty(prop))
-            return false;
-    }
-    return true;
-}
-
-
 // From: https://gomakethings.com/merging-objects-with-vanilla-javascript/
-const extend = (...args) => {
+export const extend = (...args) => {
     const extended = {};
     let deep = false;
 
@@ -73,9 +64,9 @@ const extend = (...args) => {
     return extended;
 };
 
-export const StreamUtils = {
-    retryPromiseFunc,
-    promiseTimeout,
-    isEmpty,
-    extend
-}
+export const noDebug = {
+    log: () => {},
+    warn: () => {},
+    error: () => {},
+    info: () => {}
+};
