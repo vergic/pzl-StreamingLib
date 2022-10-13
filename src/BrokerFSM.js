@@ -4,11 +4,12 @@ import { noDebug } from './StreamUtils';
 const reconnectRetryDelay = 3;
 const reconnectMaxRetries = 60; // 60 = 3 minutes if reconnectRetryDelay == 3
 
-export const initBrokerConnectionFsm = (externals, brokerEventCallbacks, debug = noDebug) => {
+export const initBrokerConnectionFsm = (externals, brokerEventCallbacks, debug) => {
     /*******************************************************************************************
      ** brokerConnection state machine
      * Using https://github.com/fschaefer/Stately.js
      *******************************************************************************************/
+    debug = debug || noDebug;
     debug.log('initBrokerConnectionFsm');
 
     const fsm_state = {

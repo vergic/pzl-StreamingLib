@@ -460,21 +460,23 @@ function _prepareEventsData(events, receivedAs, extraLoggingArg) {
     // 		StreamEventTypes.STREAM means than "events" contains a single, streamed event object (from connection.stream('Subscribe', ...)
     // "extraLoggingArg" (optional) will be added to the debug log
 
-    // Assemble debug data...
-    var debugData = [];
-    if (receivedAs === StreamEventTypes.STREAM) {
-        const eventType = (events.data && events.data.type || events.type);
-        const messageType = (events.data && events.data.messageType || events.messageType);
-        debugData.push('conversationData STREAM-event:', eventType + (eventType === 'conversationMessage' ? ' (' + messageType + ')' : ''));
-    } else if (receivedAs === StreamEventTypes.STREAMED_CHUNK) {
-        debugData.push('conversationData STREAMED_CHUNK-array:');
-    } else if (receivedAs === StreamEventTypes.STATE) {
-        debugData.push('conversationData STATE-array:');
-    } else {
-        debugData.push('conversationData (receivedAs = unknown)):');
+    if (debug && !debug.debugDisabled) {
+        // Assemble debug data (if enabled)...
+        const debugData = [];
+        if (receivedAs === StreamEventTypes.STREAM) {
+            const eventType = (events.data && events.data.type || events.type);
+            const messageType = (events.data && events.data.messageType || events.messageType);
+            debugData.push('conversationData STREAM-event:', eventType + (eventType === 'conversationMessage' ? ' (' + messageType + ')' : ''));
+        } else if (receivedAs === StreamEventTypes.STREAMED_CHUNK) {
+            debugData.push('conversationData STREAMED_CHUNK-array:');
+        } else if (receivedAs === StreamEventTypes.STATE) {
+            debugData.push('conversationData STATE-array:');
+        } else {
+            debugData.push('conversationData (receivedAs = unknown)):');
+        }
+        debugData.push(events, extraLoggingArg);
+        debug.log.apply(null, debugData);
     }
-    debugData.push(events, extraLoggingArg);
-    debug.log.apply(null, debugData);
 
     return {
         eventsArray: (receivedAs === StreamEventTypes.STREAM ? [events] : events),
@@ -510,13 +512,15 @@ function _prepareEventsData(events, receivedAs, extraLoggingArg) {
  * 			info: (...args) => { ... },
  *	 	}
  *******************************************************************************************/
-const init = async (brokerUrl, streamOptions = {}, eventHandlers = {}, debugFns = noDebug) => {
+const init = async (brokerUrl, streamOptions = {}, eventHandlers = {}, debugFns) => {
+    debug = debugFns || noDebug;
+
     if (!brokerConnection) {
         brokerConnection = initBrokerConnectionFsm({
             _connect,
             reSubscribeAll,
             unSubscribeAll
-        }, eventHandlers, debugFns);
+        }, eventHandlers, debug);
     }
 
     streamOptions.brokerTransport = streamOptions.brokerTransport || 'WebSockets';
@@ -528,7 +532,6 @@ const init = async (brokerUrl, streamOptions = {}, eventHandlers = {}, debugFns 
         streamOptions.brokerTransport !== options.brokerTransport ||
         streamOptions.brokerLogLevel !== options.brokerLogLevel)
     {
-        debug = debugFns;
         options.brokerUrl = brokerUrl;
         options.access_token = streamOptions.access_token;
         options.brokerTransport = streamOptions.brokerTransport;

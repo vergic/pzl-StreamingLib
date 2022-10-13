@@ -65,6 +65,7 @@ export const extend = (...args) => {
 };
 
 export const noDebug = {
+    debugDisabled: true,
     log: () => {},
     warn: () => {},
     error: () => {},
