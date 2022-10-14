@@ -222,23 +222,29 @@ function unSubscribeAll() {
  *******************************************************************************************/
 function getTopic(connection, subscription, fromId) {
     // debug.log('getTopic:', topic, 'from:', fromId);
-    var resultArray = [];
     return new Promise(function (resolve, reject) {
-        Stream.get(connection, subscription, fromId, options)
-            .subscribe({
-                next: function (event) {
-                    // debug.log('getTopic Get stream next:', event);
-                    resultArray.push(event);
-                },
-                complete: function () {
-                    // debug.log('getTopic Get stream complete:', resultArray);
-                    resolve(resultArray);
-                },
-                error: function (err) {
-                    debug.error('getTopic(): Get stream error:', err);
-                    reject(err);
-                }
-            });
+        const resultArray = [];
+        const reverse = (fromId < 0);
+        const handlers = {
+            next: function (event) {
+                // debug.log('getTopic Get stream next:', event);
+                resultArray.push(event);
+            },
+            complete: function () {
+                // debug.log('getTopic Get stream complete:', resultArray);
+                resolve(reverse ? resultArray.reverse() : resultArray);
+            },
+            error: function (err) {
+                debug.error('getTopic(): Get stream error:', err);
+                reject(err);
+            }
+        };
+        if (reverse) {
+            // A negative "fromId" can be used to fetch events from "latest" and back
+            Stream.getReverse(connection, subscription, -fromId).subscribe(handlers);
+        } else {
+            Stream.get(connection, subscription, fromId).subscribe(handlers);
+        }
     });
 }
 
@@ -308,6 +314,7 @@ function _getAndStreamSubscription(subscription) {
                     try {
                         // Filter eventsArray to remove duplicates (which is a recoverable error condition)
                         // Or throw a StreamErrors.TOPIC_STREAM_OUT_OF_ORDER if expected event(s) are missing (which is an unrecoverable error)
+                        // NOTE: This check assumes that events in eventsArray are in correct time order (even if fetched in reverse, i.e. from "latest" using a negative "fromEventId")
                         eventsArray = eventsArray.filter(function (event) {
                             const eventId = event[subscription.options.eventIdProperty];
                             if (eventId < subscription.lastReceivedEventId + 1) {

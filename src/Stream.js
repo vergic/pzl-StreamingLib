@@ -8,13 +8,13 @@ const get = (connection, subscription, fromId) => {
     });
 }
 
-const getReverse = (connection, subscription, fromId) => {
+const getReverse = (connection, subscription, take, skip = 0) => {
     const method = subscription.options.getReverseMethod || 'GetReverse';
     return connection.stream(method, {
         type: subscription.options.type,
         [subscription.options.topicProperty]: subscription[subscription.options.topicProperty],
-        skip: Math.max(0, fromId - 1),
-        take: 100000,
+        skip: skip, // Skip from "latest" event = usually 0
+        take: take, // No of events to 'Get' from "latest"
     });
 }
 

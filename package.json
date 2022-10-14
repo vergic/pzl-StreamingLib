@@ -1,6 +1,6 @@
 {
   "name": "pzlStreamLib",
-  "version": "1.3.2",
+  "version": "1.3.3",
   "description": "Internal Streaming library for Puzzel",
   "license": "UNLICENSED",
   "main": "src/PzlStream.js",
