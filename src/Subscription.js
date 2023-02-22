@@ -1,43 +1,45 @@
 // Simple module to create a new "subscription"-object to subscribe to events from streaming broker (via SignalR)
 // It will add and init correct default properties for usage by StreamConnector
-// Add overridden and/or custom props as the arg to extend()
+// Add overridden and/or custom props as the arg to Subscription constructor
 
-import { extend } from './StreamUtils';
+import { mergeDeep } from './StreamUtils';
 
-const defaultSubscriptionProps = {
+class DefaultSubscription {
 	// options added to support broker v3
-	options: {
-		topicProperty: 'topic',
-		topicStartEventId: 1,
-		eventIdProperty: 'id',
-		getMethod: 'Get',
-		streamMethod: 'Subscribe',
-	},
-
-	topic: '',
-	fromEventId: null,
-	subscribeInvocationId: -1,
-	subscriberRef: null,
-	lastReceivedEventId: -1,
-	onDataReceived: function() {},
-	onSubscriptionStart: null,
-	onSubscriptionEnd: null,
-
-	getSubscriptionId: function () {
-		// Should generate a string that uniquely identifies this subscription/stream
-		// Note: Two subscriptions for the same stream should result in the same "id" so we can compare and identify the same stream!!
-		return this[this.options.topicProperty];
-	},
-	toString: function () {
-		return this.getSubscriptionId();
+	constructor() {
+		this.options = {
+			topicProperty: 'topic',
+			topicStartEventId: 1,
+			eventIdProperty: 'id',
+			getMethod: 'Get',
+			streamMethod: 'Subscribe',
+		};
+		this.topic = '';
+		this.fromEventId = null;
+		this.subscribeInvocationId = -1;
+		this.subscriberRef = null;
+		this.lastReceivedEventId = -1;
+		this.onDataReceived = function () {};
+		this.onSubscriptionStart = null;
+		this.onSubscriptionEnd = null;
+		this.getSubscriptionId = function () {
+			// Should generate a string that uniquely identifies this subscription/stream
+			// Note: Two subscriptions for the same stream should result in the same "id" so we can compare and identify the same stream!!
+			return this[this.options.topicProperty];
+		};
+		this.toString = function () {
+			return this.getSubscriptionId();
+		}
 	}
-};
-
-const subscriptionFactory = props => {
-	return extend(true, {}, defaultSubscriptionProps, props); // Deep merge...
-};
-
-export default {
-	create: subscriptionFactory,
-	extend: subscriptionFactory
 }
+
+class Subscription extends DefaultSubscription {
+	constructor(props) {
+		super();
+		for (const [prop, value] of Object.entries(props)) {
+			this[prop] = mergeDeep(this[prop], value); // Deep merge each prop...
+		}
+	}
+}
+
+export default Subscription;

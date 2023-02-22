@@ -32,36 +32,36 @@ export const promiseTimeout = (promise, ms) => {
     ])
 }
 
-// From: https://gomakethings.com/merging-objects-with-vanilla-javascript/
-export const extend = (...args) => {
-    const extended = {};
-    let deep = false;
-
-    // Merge obj into extended
-    const merge = obj => {
-        for (const prop in obj) {
-            if (obj.hasOwnProperty(prop)) {
-                if (deep && Object.prototype.toString.call(obj[prop]) === '[object Object]') {
-                    // If we're doing a deep merge and the property is an object
-                    extended[prop] = extend(true, extended[prop], obj[prop]);
+export const mergeDeep = (...objects) => {
+    // Deep merge from: https://stackoverflow.com/a/48218209 (modified for unique arrays as suggested in comments)
+    // Also modified to handle primitives and differing types
+    const isObject = obj => obj && typeof obj === 'object';
+    return objects.reduce((prev = {}, obj) => {
+        if (isObject(obj)) {
+            Object.keys(obj).forEach(key => {
+                const pVal = prev[key];
+                const oVal = obj[key];
+                if (Array.isArray(oVal) && Array.isArray(pVal)) {
+                    // Merging arrays is a bit tricky: Concatenate or only keep unique elements?
+                    // prev[key] = pVal.concat(...oVal);
+                    prev[key] = [...new Set([...oVal, ...pVal])];
+                } else if (isObject(oVal) && isObject(pVal)) {
+                    prev[key] = mergeDeep(pVal, oVal);
                 } else {
-                    // Otherwise, do a regular merge
-                    extended[prop] = obj[prop];
+                    // Values are primitives or of different types
+                    if (isObject(pVal)) {
+                        prev[key] = oVal;
+                    } else {
+                        // prev[key] not an object! => Simply overwrite prev!
+                        prev = obj;
+                    }
                 }
-            }
-        }
-    };
-
-    args.forEach((arg, i) => {
-        if (i === 0 && typeof (arg) === 'boolean') {
-            // First arg controls "deep merge" if its type is boolean
-            deep = arg;
+            });
+            return prev;
         } else {
-            merge(arg);
+            return obj;
         }
-    })
-
-    return extended;
+    }, {});
 };
 
 export const noDebug = {
