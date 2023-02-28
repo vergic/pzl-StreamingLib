@@ -1,10 +1,10 @@
 import Stately from 'stately.js';
 import { noDebug } from './StreamUtils';
 
-const reconnectRetryDelay = 3;
-const reconnectMaxRetries = 60; // 60 = 3 minutes if reconnectRetryDelay == 3
+const reconnectRetryDelay = 10;
+const reconnectMaxRetries = 12; // 12 retries á 10 sec = 2 minutes
 
-export const initBrokerConnectionFsm = (externals, brokerEventCallbacks, debug) => {
+export const initBrokerConnectionFsm = (externals, brokerEventCallbacks = {}, debug) => {
     /*******************************************************************************************
      ** brokerConnection state machine
      * Using https://github.com/fschaefer/Stately.js
@@ -20,7 +20,6 @@ export const initBrokerConnectionFsm = (externals, brokerEventCallbacks, debug) 
         brokerEventCallbacks
     };
 
-    const transition = (toState, action = undefined) => { fsm_state.fsm.setMachineState(toState, action) }
     const handle = (action, ...args) => fsm_state.fsm[action](...args);
     const on = (eventName, callback) => {
         fsm_state.eventListeners[eventName] = (fsm_state.eventListeners[eventName] || []).concat(callback);
@@ -68,17 +67,18 @@ export const initBrokerConnectionFsm = (externals, brokerEventCallbacks, debug) 
             }
         },
         connected: {
-            _onEnter: function (action, prevState, newState) {
-                debug.log('FSM: connected._onEnter()');
-                if (fsm_state.brokerEventCallbacks && typeof fsm_state.brokerEventCallbacks.onConnectionStarted === 'function') {
-                    fsm_state.brokerEventCallbacks.onConnectionStarted(fsm_state.connection);
+            _onEnter: function (action, prevState) {
+                debug.log('FSM: connected._onEnter()', action, prevState);
+                if (prevState === 'reconnecting') {
+                    // If coming here from 'reconnecting', we should resubscribe all subscriptions
+                    // (can't be done in 'reconnecting', since reSubscribeAll() will only work in state 'connected'!)
+                    externals.reSubscribeAll();
                 }
+                typeof fsm_state?.brokerEventCallbacks?.onConnectionStarted === 'function' && fsm_state.brokerEventCallbacks.onConnectionStarted(fsm_state.connection);
             },
             connection_failed: function () {
                 // Broker connection closed in "connected"-state - try to auto-reconnect to broker...
-                if (fsm_state.brokerEventCallbacks && typeof fsm_state.brokerEventCallbacks.onConnectionFailed === 'function') {
-                    fsm_state.brokerEventCallbacks.onConnectionFailed('connection failed');
-                }
+                typeof fsm_state?.brokerEventCallbacks?.onConnectionFailed === 'function' && fsm_state.brokerEventCallbacks.onConnectionFailed('connection failed');
                 fsm_state.connection = null;
                 fsm_state.reconnectCounter = 0;
                 return this.reconnect_wait;
@@ -124,13 +124,13 @@ export const initBrokerConnectionFsm = (externals, brokerEventCallbacks, debug) 
             },
             connection_ok: function (connection) {
                 fsm_state.connection = connection;
-                transition('connected');
-                externals.reSubscribeAll();	// After successful re-connect, also re-subscribe to all topics! (i.e. different from "connection_ok" in the state "connecting")
+                // After successful re-connect, transition to 'connected'
+                // After the transition, all existing subscriptions will be re-subscribed
+                // (but reSubscribeAll() can only be done *AFTER* the transition because it needs to be 'connected')!
+                return this.connected;
             },
             connection_failed: function (err) {
-                if (fsm_state.brokerEventCallbacks && typeof fsm_state.brokerEventCallbacks.onConnectionFailed === 'function') {
-                    fsm_state.brokerEventCallbacks.onConnectionFailed(err);
-                }
+                typeof fsm_state?.brokerEventCallbacks?.onConnectionFailed === 'function' && fsm_state.brokerEventCallbacks.onConnectionFailed(err);
                 return this.reconnect_wait;
             },
             disconnect: function () {
@@ -155,6 +155,7 @@ export const initBrokerConnectionFsm = (externals, brokerEventCallbacks, debug) 
                 }
             },
             disconnect_ok: function () {
+                typeof fsm_state?.brokerEventCallbacks?.onDisconnected === 'function' && fsm_state.brokerEventCallbacks.onDisconnected();
                 return this.disconnected;
             }
         }
@@ -207,7 +208,6 @@ export const initBrokerConnectionFsm = (externals, brokerEventCallbacks, debug) 
     fsm_state.fsm = new Stately(fsmStates, 'disconnected');
 
     return {
-        transition,
         handle,
         on,
         off,

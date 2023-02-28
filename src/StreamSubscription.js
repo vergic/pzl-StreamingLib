@@ -33,7 +33,7 @@ class DefaultSubscription {
 	}
 }
 
-class Subscription extends DefaultSubscription {
+class StreamSubscription extends DefaultSubscription {
 	constructor(props) {
 		super();
 		for (const [prop, value] of Object.entries(props)) {
@@ -42,4 +42,4 @@ class Subscription extends DefaultSubscription {
 	}
 }
 
-export default Subscription;
+export default StreamSubscription;

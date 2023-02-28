@@ -11,7 +11,7 @@ const reconnectMaxRetries = 60; // 60 = 3 minutes if reconnectRetryDelay == 3
 
 let debug = noDebug;
 
-const options = {
+let options = {
     publishMethod: 'Publish',
     brokerUrl: null,
     brokerTransport: 'WebSockets',
@@ -60,16 +60,18 @@ function _connect() {
     var hubConnectionBuilder = new signalr.HubConnectionBuilder()
         .withUrl(options.brokerUrl, brokerConnectionOptions)
         .configureLogging(options.brokerLogLevel)
-        .withAutomaticReconnect([0, 500, 3000, 5000, 10000]);
+        .withAutomaticReconnect(options.reconnectRetryPolicy || [0, 500, 3000, 5000, 10000]);
     var connection = hubConnectionBuilder.build();
 
     connection.onreconnecting(function (err) {
         debug.warn('_connect: Broker connection onreconnecting:', err, connection.connectionState, connection.receivedHandshakeResponse);
+        typeof options.brokerEventHandlers?.onReconnecting === 'function' && options.brokerEventHandlers.onReconnecting(err);
         unSubscribeAll();
     });
 
-    connection.onreconnected(function () {
+    connection.onreconnected(function (connectionId) {
         debug.warn('_connect: Broker connection onreconnected:', connection.connectionState, connection.receivedHandshakeResponse);
+        typeof options.brokerEventHandlers?.onReconnected === 'function' && options.brokerEventHandlers.onReconnected(connectionId);
         reSubscribeAll();
     });
 
@@ -163,10 +165,10 @@ function getConnection() {
 
 
 /*******************************************************************************************
- ** Functions for addig and remoing topic subscriptions
+ ** Functions for adding and removing streamSubscriptions
  *******************************************************************************************/
-function addSubscription(subscription, timeout) {
-    debug.log('addSubscription:', subscription, timeout);
+function addStreamSubscription(subscription, timeout) {
+    debug.log('addStreamSubscription:', subscription, timeout);
     unsubscribe(subscription);
     SubscriptionsStore.add(subscription);
 
@@ -179,9 +181,9 @@ function addSubscription(subscription, timeout) {
     }
 }
 
-function removeSubscription(subscription) {
-    // Can either take a subscription object, or a subscriptionId (returned from Subscription.getSubscriptionId())
-    debug.log('removeSubscription:', subscription);
+function removeStreamSubscription(subscription) {
+    // Can either take a streamSubscription object, or a subscriptionId (returned from StreamSubscription.getSubscriptionId())
+    debug.log('removeStreamSubscription:', subscription);
 
     if (typeof subscription === 'string') {
         subscription = SubscriptionsStore.findById(subscription);
@@ -448,7 +450,7 @@ function publishTopicIfConnected(topic, data) {
 }
 
 
-function getSubscriptions() {
+function getStreamSubscriptions() {
     return SubscriptionsStore.getAll();
 }
 
@@ -497,18 +499,24 @@ function _prepareEventsData(events, receivedAs, extraLoggingArg) {
  *
  *   brokerUrl        = URL to CommSrv broker endpoint
  *
- *   streamOptions    = Config object for signalR and related behavior
- *        streamOptions.brokerTransport (optional, default 'WebSockets'):
- *        One of: 'None' | 'Negotiate' | 'WebSockets' | 'LongPolling' | 'ServerSentEvents'
- *      streamOptions.brokerLogLevel (optional, default 'none'):
- *            One of: 'trace' | 'debug' | 'info' | 'warn' | 'error' | 'critical' | 'none'
- *      streamOptions.streamingSubscribeOnly (optional, default false):
- *        If true, topic history/state is not fetched using 'Get' (i.e. everything is streamed using 'Subscribe' only)
+ *   initOptions      = Config object for signalR and related behavior
+ *       initOptions.brokerTransport (optional, default 'WebSockets'):
+ *          One of: 'None' | 'Negotiate' | 'WebSockets' | 'LongPolling' | 'ServerSentEvents'
+ *       initOptions.brokerLogLevel (optional, default 'none'):
+ *          One of: 'trace' | 'debug' | 'info' | 'warn' | 'error' | 'critical' | 'none'
+ *       initOptions.streamingSubscribeOnly (optional, default false):
+ *          If true, topic history/state is not fetched using 'Get' (i.e. everything is streamed using 'Subscribe' only)
+ *       initOptions.reconnectRetryPolicy (optional, default [0, 500, 3000, 5000, 10000]):
+ *          An array of retry intervals times in ms, or an object with more controlled retry policy
+ *          (see "Automatically reconnect" on https://learn.microsoft.com/en-us/aspnet/core/signalr/javascript-client?view=aspnetcore-7.0&tabs=visual-studio)
  *
  *   eventHandlers    = Object containing (optional) event handler hook functions, e.g.
  *      {
- *    		onConnectionStarted = function (connection) { // Do something on broker connection started...  },
- *    		onConnectionFailed = function (connection) { // Do something on broker connection failed... },
+ *    		onConnectionStarted = (connection) => { // Do something on broker connection started...  },
+ *    		onConnectionFailed  = (error) => { // Do something on broker connection failed... },
+ *    	    onDisconnected = () => { // Do something on broker disconnect (after auto reconnect failed... }
+ *   	    onReconnecting = (error) => { // Do something on broker auto-reconnecting... }
+ *  	    onReconnected = (connectionId) => { // Do something on successful broker auto-reconnect... }
  *		}
  *
  *   debugFns        = Optional object containing debug functions (default will be noop), e.g.:
@@ -519,7 +527,7 @@ function _prepareEventsData(events, receivedAs, extraLoggingArg) {
  * 			info: (...args) => { ... },
  *	 	}
  *******************************************************************************************/
-const init = async (brokerUrl, streamOptions = {}, eventHandlers = {}, debugFns) => {
+const init = async (brokerUrl, initOptions = {}, brokerEventHandlers = {}, debugFns) => {
     debug = debugFns || noDebug;
 
     if (!brokerConnection) {
@@ -527,25 +535,26 @@ const init = async (brokerUrl, streamOptions = {}, eventHandlers = {}, debugFns)
             _connect,
             reSubscribeAll,
             unSubscribeAll
-        }, eventHandlers, debug);
+        }, brokerEventHandlers, debug);
     }
 
-    streamOptions.brokerTransport = streamOptions.brokerTransport || 'WebSockets';
-    streamOptions.brokerLogLevel = streamOptions.brokerLogLevel || 'none';
-    streamOptions.streamingSubscribeOnly = streamOptions.streamingSubscribeOnly || false;
+    initOptions.brokerTransport = initOptions.brokerTransport || 'WebSockets';
+    initOptions.brokerLogLevel = initOptions.brokerLogLevel || 'none';
+    initOptions.streamingSubscribeOnly = initOptions.streamingSubscribeOnly || false;
 
     if (brokerUrl && brokerUrl !== options.brokerUrl ||
-        streamOptions.access_token !== options.access_token ||
-        streamOptions.brokerTransport !== options.brokerTransport ||
-        streamOptions.brokerLogLevel !== options.brokerLogLevel)
+        initOptions.access_token !== options.access_token ||
+        initOptions.brokerTransport !== options.brokerTransport ||
+        initOptions.brokerLogLevel !== options.brokerLogLevel)
     {
-        options.brokerUrl = brokerUrl;
-        options.access_token = streamOptions.access_token;
-        options.brokerTransport = streamOptions.brokerTransport;
-        options.brokerLogLevel = streamOptions.brokerLogLevel;
-        options.streamingSubscribeOnly = streamOptions.streamingSubscribeOnly;
+        options = {
+            ...options,
+            brokerUrl,
+            ...initOptions,
+            brokerEventHandlers
+        }
 
-        brokerConnection.setEventCallbacks(eventHandlers);
+        brokerConnection.setEventCallbacks(brokerEventHandlers);
 
         debug.log('Initializing StreamConnector');
         debug.log('SignalR client lib version:', signalr.VERSION);
@@ -570,9 +579,9 @@ const init = async (brokerUrl, streamOptions = {}, eventHandlers = {}, debugFns)
 
 export default {
     _signalr: signalr,	// Expose the signalr lib  - mainly for debugging...
-    init: init,
-    getSubscriptions: getSubscriptions,
-    addSubscription: addSubscription,
-    removeSubscription: removeSubscription,
-    publishTopicIfConnected: publishTopicIfConnected
+    init,
+    getStreamSubscriptions,
+    addStreamSubscription,
+    removeStreamSubscription,
+    publishTopicIfConnected
 }
