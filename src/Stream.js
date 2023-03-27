@@ -4,8 +4,7 @@ const get = (connection, subscription, fromId) => {
     return connection.stream(method, {
         type,
         [subscription.options.topicProperty]: topic,
-        skip: Math.max(0, fromId - 1),
-        take: 100000,
+        skip: Math.max(0, fromId - 1) || undefined
     });
 }
 
@@ -15,8 +14,8 @@ const getReverse = (connection, subscription, take, skip = 0) => {
     return connection.stream(method, {
         type,
         [subscription.options.topicProperty]: topic,
-        skip: skip, // Skip from "latest" event = usually 0
-        take: take, // No of events to 'Get' from "latest"
+        skip: Math.max(0, skip) || undefined,
+        take, // No of events to 'Get' from "latest"
     });
 }
 
@@ -26,8 +25,7 @@ const stream = (connection, subscription, fromId) => {
     return connection.stream(method, {
         type,
         [subscription.options.topicProperty]: topic,
-        skip: Math.max(0, fromId - 1),
-        take: 100000,
+        skip: Math.max(0, fromId - 1) || undefined
     });
 }
 
