@@ -293,7 +293,7 @@ function _getAndStreamSubscription(subscription) {
             var getFullTopicState = (subscription.lastReceivedEventId < 0 && (typeof subscription.fromEventId !== 'number' || subscription.fromEventId === subscription.options.topicStartEventId)); // No events received yet, and no "fromEventId" specified (different from "topicStartEventId") => We want the full topic state!
             var fromEventId = (getFullTopicState ? subscription.options.topicStartEventId : (subscription.lastReceivedEventId >= 0 ? subscription.lastReceivedEventId + 1 : subscription.fromEventId));
             var getTopicPromise;
-            if (options.streamingSubscribeOnly) {
+            if (options.streamingSubscribeOnly || subscription.streamingSubscribeOnly) {
                 getTopicPromise = Promise.resolve([]);
             } else {
                 debug.log('_getAndStreamSubscription: \'Get\': ', subscription, ' from: ', fromEventId, 'invocationId:', currentSubscribeInvocationId);
