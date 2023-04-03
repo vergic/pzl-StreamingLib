@@ -51,10 +51,12 @@ function _connect() {
             }
     }
 
-    if (options.access_token) {
-        brokerConnectionOptions.accessTokenFactory = () => {
-            return options.access_token
-        }
+    if (typeof options.accessTokenFactory === 'function') {
+        // If an accessTokenFactory()-function is supplied with options, use that.
+        brokerConnectionOptions.accessTokenFactory = options.accessTokenFactory
+    } else if (options.access_token) {
+        // ...else if "access_token" is supplied as a string, create an accessTokenFactory() returning it
+        brokerConnectionOptions.accessTokenFactory = () => options.access_token;
     }
 
     var hubConnectionBuilder = new signalr.HubConnectionBuilder()
@@ -293,7 +295,18 @@ function _getAndStreamSubscription(subscription) {
             var getFullTopicState = (subscription.lastReceivedEventId < 0 && (typeof subscription.fromEventId !== 'number' || subscription.fromEventId === subscription.options.topicStartEventId)); // No events received yet, and no "fromEventId" specified (different from "topicStartEventId") => We want the full topic state!
             var fromEventId = (getFullTopicState ? subscription.options.topicStartEventId : (subscription.lastReceivedEventId >= 0 ? subscription.lastReceivedEventId + 1 : subscription.fromEventId));
             var getTopicPromise;
-            if (options.streamingSubscribeOnly || subscription.streamingSubscribeOnly) {
+
+            // Decide if we should do invoke 'Get' before start streaming the topic or not.
+            // Streaming a large state with many events will be inefficient, so usually when
+            // getting a topic from start (full topic history/state), we want to invoke 'Get' first.
+            // But when only subscribing for incremental (real-time) events,
+            // we want to start streaming directly from last received eventId, without first invoking 'Get' (which causes an extra db lookup in BE)
+
+            // Merge settings from subscription and global option (settings on the individual subscriptions have priority!)
+            const streamingSubscribeOnly = (typeof subscription.streamingSubscribeOnly === 'boolean' ? subscription.streamingSubscribeOnly : options.streamingSubscribeOnly);
+            const streamingSubscribeOnResume = (typeof subscription.streamingSubscribeOnResume === 'boolean' ? subscription.streamingSubscribeOnResume : options.streamingSubscribeOnResume);
+            if (streamingSubscribeOnly || streamingSubscribeOnResume && !getFullTopicState) {
+                // Skip invoking an initial 'Get' for this topic if settings say: streamingSubscribeOnly or streamingSubscribeOnResume and we are not fetching the full topic state
                 getTopicPromise = Promise.resolve([]);
             } else {
                 debug.log('_getAndStreamSubscription: \'Get\': ', subscription, ' from: ', fromEventId, 'invocationId:', currentSubscribeInvocationId);
@@ -540,7 +553,9 @@ const init = async (brokerUrl, initOptions = {}, brokerEventHandlers = {}, debug
 
     initOptions.brokerTransport = initOptions.brokerTransport || 'WebSockets';
     initOptions.brokerLogLevel = initOptions.brokerLogLevel || 'none';
-    initOptions.streamingSubscribeOnly = initOptions.streamingSubscribeOnly || false;
+    initOptions.streamingSubscribeOnly = !!initOptions.streamingSubscribeOnly || false;     // default false
+    initOptions.streamingSubscribeOnResume = (initOptions.streamingSubscribeOnResume === false ? false : true); // default true
+    initOptions.access_token = initOptions.access_token || initOptions.accessTokenFactory?.() || null;
 
     if (brokerUrl && brokerUrl !== options.brokerUrl ||
         initOptions.access_token !== options.access_token ||
@@ -577,9 +592,43 @@ const init = async (brokerUrl, initOptions = {}, brokerEventHandlers = {}, debug
     }
 };
 
+const updateAccessToken = async (new_access_token) => {
+    // Call when access_token has changed.
+    // Will re-connect broker and re-subscribe of connected and token has changed
+    // (just like on init() above, but will not require re-register options and handlers)
+    // If "new_access_token" is empty/false/null, options.accessTokenFactory?.() will be called instead
+    // I.e. if an accessTokenFactory()-function has been supplied in options,
+    // this function can be called without options to force a token re-check using accessTokenFactory()
+
+    if (!brokerConnection) {
+        throw new Error('StreamConnection not initialized. This function can only be called after init')
+    }
+
+    new_access_token = new_access_token || options.accessTokenFactory?.() || null;
+
+    if (new_access_token !== options.access_token) {
+        options.access_token = new_access_token;
+        debug.log('StreamConnector.updateAccessToken(): new access_token');
+        if (!isDisconnected()) {
+            // If we have an active connection: Re-connect to broker with the new brokerUrl, access_token or changed options...
+            try {
+                const connection = await reConnectToBroker();
+                debug.log('StreamConnector.updateAccessToken(): Successfully re-connected to broker', connection);
+                return 're-connected';
+            } catch (err) {
+                debug.error('StreamConnector.updateAccessToken(): Error re-connecting to broker', err);
+                throw ('Error re-connecting');
+            }
+        }
+    } else {
+        debug.log('StreamConnector.updateAccessToken(): access_token not changed => Do nothing');
+    }
+};
+
 export default {
     _signalr: signalr,	// Expose the signalr lib  - mainly for debugging...
     init,
+    updateAccessToken,
     getStreamSubscriptions,
     addStreamSubscription,
     removeStreamSubscription,
