@@ -555,7 +555,7 @@ const init = async (brokerUrl, initOptions = {}, brokerEventHandlers = {}, debug
     initOptions.brokerLogLevel = initOptions.brokerLogLevel || 'none';
     initOptions.streamingSubscribeOnly = !!initOptions.streamingSubscribeOnly || false;     // default false
     initOptions.streamingSubscribeOnResume = (initOptions.streamingSubscribeOnResume === false ? false : true); // default true
-    initOptions.access_token = initOptions.access_token || initOptions.accessTokenFactory?.() || null;
+    initOptions.access_token = initOptions.access_token || await initOptions.accessTokenFactory?.() || null;
 
     if (brokerUrl && brokerUrl !== options.brokerUrl ||
         initOptions.access_token !== options.access_token ||
