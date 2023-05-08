@@ -9,3 +9,5 @@ yarn.lock
 workspace.xml
 tasks.xml
 *.iws
+
+dist
