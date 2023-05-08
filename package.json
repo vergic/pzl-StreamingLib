@@ -1,6 +1,6 @@
 {
   "name": "pzl-stream-lib",
-  "version": "1.4.5",
+  "version": "1.4.6",
   "description": "Internal Streaming library for Puzzel",
   "license": "UNLICENSED",
   "main": "dist/pzl-stream-lib.js",
@@ -9,7 +9,7 @@
     "node": ">=0.10.24"
   },
   "scripts": {
-    "prebuild": "rimraf dist/*",
+    "prebuild": "rimraf -g dist/*",
     "build": "npm run build:prod && npm run build:dev",
     "build:dev": "webpack -c webpack.dev.config.js",
     "build:prod": "webpack -c webpack.prod.config.js",
@@ -29,7 +29,7 @@
     "babel-loader": "^9.1.2",
     "cross-env": "^7.0.3",
     "onchange": "^7.1.0",
-    "rimraf": "^3.0.2",
+    "rimraf": "5.0.0",
     "terser-webpack-plugin": "^5.3.7",
     "webpack": "^5.80.0",
     "webpack-cli": "^5.0.2"
