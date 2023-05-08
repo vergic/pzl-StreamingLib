@@ -7,7 +7,7 @@ import { promiseTimeout, retryPromiseFunc, noDebug } from './StreamUtils';
 import * as SubscriptionsStore from './SubscriptionsStore';
 
 const resubscribeDelay = 1;
-const reconnectMaxRetries = 60; // 60 = 3 minutes if reconnectRetryDelay == 3
+const reconnectMaxRetries = 60; // 60 = 1 minute if resubscribeDelay == 1
 
 let debug = noDebug;
 
@@ -27,11 +27,11 @@ function _connect() {
 
     debug.log('_connect: Connecting to broker url: ' + options.brokerUrl);
 
-    var brokerConnectionOptions;
+    let brokerConnectionOptions;
     switch (options.brokerTransport) {
         case 'None':
         case 'Negotiate':
-            brokerConnectionOptions = null;
+            brokerConnectionOptions = {};
             break;
         case 'LongPolling':
             brokerConnectionOptions = {
@@ -51,42 +51,38 @@ function _connect() {
             }
     }
 
-    if (typeof options.accessTokenFactory === 'function') {
-        // If an accessTokenFactory()-function is supplied with options, use that.
-        brokerConnectionOptions.accessTokenFactory = options.accessTokenFactory
-    } else if (options.access_token) {
-        // ...else if "access_token" is supplied as a string, create an accessTokenFactory() returning it
-        brokerConnectionOptions.accessTokenFactory = () => options.access_token;
-    }
+    // If an accessTokenFactory()-function is supplied with options, use that.
+    // ...else if "access_token" is supplied as a string, create an accessTokenFactory() returning it
+    brokerConnectionOptions.accessTokenFactory = options.accessTokenFactory || options.access_token && (() => options.access_token) || null;
 
-    var hubConnectionBuilder = new signalr.HubConnectionBuilder()
+    const hubConnectionBuilder = new signalr.HubConnectionBuilder()
         .withUrl(options.brokerUrl, brokerConnectionOptions)
         .configureLogging(options.brokerLogLevel)
         .withAutomaticReconnect(options.reconnectRetryPolicy || [0, 500, 3000, 5000, 10000]);
-    var connection = hubConnectionBuilder.build();
+    const connection = hubConnectionBuilder.build();
 
-    connection.onreconnecting(function (err) {
+    connection.onreconnecting(err => {
         debug.warn('_connect: Broker connection onreconnecting:', err, connection.connectionState, connection.receivedHandshakeResponse);
         typeof options.brokerEventHandlers?.onReconnecting === 'function' && options.brokerEventHandlers.onReconnecting(err);
         unSubscribeAll();
     });
 
-    connection.onreconnected(function (connectionId) {
+    connection.onreconnected(async connectionId => {
         debug.warn('_connect: Broker connection onreconnected:', connection.connectionState, connection.receivedHandshakeResponse);
         typeof options.brokerEventHandlers?.onReconnected === 'function' && options.brokerEventHandlers.onReconnected(connectionId);
-        reSubscribeAll();
+        await reSubscribeAll();
     });
 
-    connection.onclose(function (err) {
+    connection.onclose(err => {
         debug.log('_connect: Broker connection closed:', err, connection.connectionState, connection.receivedHandshakeResponse);
         brokerConnection.handle('connection_failed');
     });
 
     // Start the connection...
-    connection.start().then(function () {
+    connection.start().then(() => {
         debug.log('_connect: Broker connection.start() successful:', connection, connection.connectionState, connection.receivedHandshakeResponse);
         brokerConnection.handle('connection_ok', connection);
-    }, function (err) {
+    }, err => {
         debug.log('_connect: Broker connection.start() error: ', err, connection, connection.connectionState);
         brokerConnection.handle('connection_failed', err);
     });
@@ -594,7 +590,7 @@ const init = async (brokerUrl, initOptions = {}, brokerEventHandlers = {}, debug
 
 const updateAccessToken = async (new_access_token) => {
     // Call when access_token has changed.
-    // Will re-connect broker and re-subscribe of connected and token has changed
+    // Will re-connect broker and re-subscribe if connected and token has changed
     // (just like on init() above, but will not require re-register options and handlers)
     // If "new_access_token" is empty/false/null, options.accessTokenFactory?.() will be called instead
     // I.e. if an accessTokenFactory()-function has been supplied in options,
@@ -604,7 +600,7 @@ const updateAccessToken = async (new_access_token) => {
         throw new Error('StreamConnection not initialized. This function can only be called after init')
     }
 
-    new_access_token = new_access_token || options.accessTokenFactory?.() || null;
+    new_access_token = new_access_token || await options.accessTokenFactory?.() || null;
 
     if (new_access_token !== options.access_token) {
         options.access_token = new_access_token;

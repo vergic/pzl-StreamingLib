@@ -4,18 +4,17 @@ const helpers = require('./webpack.helpers');
 module.exports = {
   mode: 'development',
   entry: {
-    'pzlStreamLib': './src/PzlStream.js',
+    'pzl-stream-lib': './src/PzlStream.js',
+  },
+  experiments: {
+    outputModule: true,
   },
   output: {
     path: path.resolve(__dirname, 'dist'),
     filename: '[name].js',
     library: {
-      name: 'pzlStreamLib',
-      type: 'umd',
-      export: 'default',
+      type: 'module',
     },
-    globalObject: 'this',
-    umdNamedDefine: true,
   },
   target: ['web', 'es5'],
   module: {

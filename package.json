@@ -1,9 +1,10 @@
 {
-  "name": "pzlStreamLib",
-  "version": "1.4.4",
+  "name": "pzl-stream-lib",
+  "version": "1.4.5",
   "description": "Internal Streaming library for Puzzel",
   "license": "UNLICENSED",
-  "main": "src/PzlStream.js",
+  "main": "dist/pzl-stream-lib.js",
+  "module": "src/PzlStream.js",
   "engines": {
     "node": ">=0.10.24"
   },
@@ -12,6 +13,7 @@
     "build": "npm run build:prod && npm run build:dev",
     "build:dev": "webpack -c webpack.dev.config.js",
     "build:prod": "webpack -c webpack.prod.config.js",
+    "postinstall": "npm run build",
     "watch": "onchange \"src/**/*.js\" -- npm run build:dev"
   },
   "dependencies": {

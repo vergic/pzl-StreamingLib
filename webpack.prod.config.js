@@ -5,18 +5,17 @@ const TerserPlugin = require('terser-webpack-plugin');
 module.exports = {
   mode: 'production',
   entry: {
-    'pzlStreamLib': './src/PzlStream.js',
+    'pzl-stream-lib': './src/PzlStream.js',
+  },
+  experiments: {
+    outputModule: true,
   },
   output: {
     path: path.resolve(__dirname, 'dist'),
     filename: '[name].min.js',
     library: {
-      name: 'pzlStreamLib',
-      type: 'umd',
-      export: 'default',
-    },
-    globalObject: 'this',
-    umdNamedDefine: true,
+      type: 'module',
+    }
   },
   target: ['web', 'es5'],
   module: {
