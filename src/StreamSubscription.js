@@ -15,6 +15,7 @@ class DefaultSubscription {
 			streamMethod: 'Subscribe',
 		};
 		this.topic = '';
+		this.extraProps = null;
 		this.fromEventId = null;
 		this.subscribeInvocationId = -1;
 		this.subscriberRef = null;

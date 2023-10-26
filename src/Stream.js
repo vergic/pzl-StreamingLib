@@ -4,7 +4,8 @@ const get = (connection, subscription, fromId) => {
     return connection.stream(method, {
         type,
         [subscription.options.topicProperty]: topic,
-        skip: Math.max(0, fromId - 1) || undefined
+        skip: Math.max(0, fromId - 1) || undefined,
+        ...(subscription.extraProps || {})
     });
 }
 
@@ -16,6 +17,7 @@ const getReverse = (connection, subscription, take, skip = 0) => {
         [subscription.options.topicProperty]: topic,
         skip: Math.max(0, skip) || undefined,
         take, // No of events to 'Get' from "latest"
+        ...(subscription.extraProps || {})
     });
 }
 
@@ -25,16 +27,18 @@ const stream = (connection, subscription, fromId) => {
     return connection.stream(method, {
         type,
         [subscription.options.topicProperty]: topic,
-        skip: Math.max(0, fromId - 1) || undefined
+        skip: Math.max(0, fromId - 1) || undefined,
+        ...(subscription.extraProps || {})
     });
 }
 
-const publish = (connection, topic, data, options) => {
+const publish = (connection, topic, data, options, extraProps = {}) => {
     // NOTE: Publish is not yet implemented in OnePlatform broker...
     const method = options.publishMethod || 'Publish';
     return connection.invoke(method, {
         topic,
-        data
+        data,
+        ...extraProps
     });
 }
 
