@@ -27,7 +27,7 @@ export const promiseTimeout = (promise, ms) => {
     return Promise.race([
         promise,
         new Promise(function (resolve, reject) {
-            wait(ms).then(reject.bind(null, 'timeout'))
+            wait(ms).then(reject.bind(null, new Error('timeout')))
         })
     ])
 }
