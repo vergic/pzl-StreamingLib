@@ -537,7 +537,9 @@ function _prepareEventsData(events, receivedAs, extraLoggingArg) {
  *	 	}
  *******************************************************************************************/
 const init = async (brokerUrl, initOptions = {}, brokerEventHandlers = {}, debugFns) => {
-    debug = debugFns || noDebug;
+    const debugOverride = (localStorage.getItem('pzl_debug_streaming') === 'true');
+    debug = debugOverride && console || debugFns || noDebug;
+    const brokerLogLevelOverride = localStorage.getItem('pzl_broker_log_level');
 
     if (!brokerConnection) {
         brokerConnection = initBrokerConnectionFsm({
@@ -548,7 +550,7 @@ const init = async (brokerUrl, initOptions = {}, brokerEventHandlers = {}, debug
     }
 
     initOptions.brokerTransport = initOptions.brokerTransport || 'WebSockets';
-    initOptions.brokerLogLevel = initOptions.brokerLogLevel || 'none';
+    initOptions.brokerLogLevel = brokerLogLevelOverride || initOptions.brokerLogLevel || 'none';
     initOptions.streamingSubscribeOnly = !!initOptions.streamingSubscribeOnly || false;     // default false
     initOptions.streamingSubscribeOnResume = (initOptions.streamingSubscribeOnResume === false ? false : true); // default true
     initOptions.access_token = initOptions.access_token || await initOptions.accessTokenFactory?.() || null;
