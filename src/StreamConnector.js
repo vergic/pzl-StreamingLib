@@ -537,9 +537,9 @@ function _prepareEventsData(events, receivedAs, extraLoggingArg) {
  *	 	}
  *******************************************************************************************/
 const init = async (brokerUrl, initOptions = {}, brokerEventHandlers = {}, debugFns) => {
-    const debugOverride = (localStorage.getItem('pzl_debug_streaming') === 'true');
+    const debugOverride = (localStorage.getItem('pzl-streaming-debug') === 'true');
     debug = debugOverride && console || debugFns || noDebug;
-    const brokerLogLevelOverride = localStorage.getItem('pzl_broker_log_level');
+    const brokerLogLevelOverride = (localStorage.getItem('pzl-broker-log-level')) || debugOverride && 'info' || null;
 
     if (!brokerConnection) {
         brokerConnection = initBrokerConnectionFsm({
