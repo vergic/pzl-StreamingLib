@@ -1,6 +1,6 @@
 {
   "name": "pzl-stream-lib",
-  "version": "1.5.1",
+  "version": "1.5.2",
   "description": "Internal Streaming library for Puzzel",
   "license": "UNLICENSED",
   "main": "dist/pzl-stream-lib.min.js",
@@ -8,7 +8,8 @@
   "exports": {
     ".": "./dist/pzl-stream-lib.min.js",
     "./node": "./dist/pzl-stream-lib.node.min.cjs",
-    "./dist/*": "./dist/*"
+    "./dist/*": "./dist/*",
+    "./src/*": "./src/*"
   },
   "engines": {
     "node": ">=16"
