@@ -1,0 +1,49 @@
+name: Build and Upload Release Artifacts
+
+on:
+  release:
+    types: [created]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [20]  # Pin your desired Node.js version here
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build project
+        run: npm run build
+
+      # ✅ Full release zip (excluding .github, including dist)
+      - name: Create full release zip
+        run: |
+          mkdir release
+          rsync -av --progress . ./release --exclude .git --exclude .github --exclude node_modules
+          cd release && zip -r ../pzl-stream-lib-dist.zip .
+
+      # ✅ Dist-only zip
+      - name: Create dist-only zip
+        run: zip -r dist-only.zip dist/
+
+      # ✅ Upload both zips to release
+      - name: Upload zips to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            pzl-stream-lib-dist.zip
+            dist-only.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

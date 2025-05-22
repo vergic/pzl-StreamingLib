@@ -64,6 +64,16 @@ export const mergeDeep = (...objects) => {
     }, {});
 };
 
+export const safeLocalStorageGet = key => {
+    try {
+        if (typeof localStorage !== 'undefined') {
+            return localStorage.getItem(key);
+        }
+    } catch (e) {
+        // Node or sandboxed env — ignore
+    }
+}
+
 export const noDebug = {
     debugDisabled: true,
     log: () => {},

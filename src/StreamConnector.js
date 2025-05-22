@@ -3,7 +3,7 @@ import { initBrokerConnectionFsm } from './BrokerFSM';
 import StreamEventTypes from './StreamEventTypes';
 import StreamErrors from './StreamErrors';
 import { Stream } from './Stream';
-import { promiseTimeout, retryPromiseFunc, noDebug } from './StreamUtils';
+import { promiseTimeout, retryPromiseFunc, noDebug, safeLocalStorageGet } from './StreamUtils';
 import * as SubscriptionsStore from './SubscriptionsStore';
 
 const resubscribeDelay = 1;
@@ -537,9 +537,9 @@ function _prepareEventsData(events, receivedAs, extraLoggingArg) {
  *	 	}
  *******************************************************************************************/
 const init = async (brokerUrl, initOptions = {}, brokerEventHandlers = {}, debugFns) => {
-    const debugOverride = (localStorage.getItem('pzl-streaming-debug') === 'true');
+    const debugOverride = (safeLocalStorageGet('pzl-streaming-debug') === 'true');
     debug = debugOverride && console || debugFns || noDebug;
-    const brokerLogLevelOverride = (localStorage.getItem('pzl-broker-log-level')) || debugOverride && 'info' || null;
+    const brokerLogLevelOverride = safeLocalStorageGet('pzl-broker-log-level') || debugOverride && 'info' || null;
 
     if (!brokerConnection) {
         brokerConnection = initBrokerConnectionFsm({
