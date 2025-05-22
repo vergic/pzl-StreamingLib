@@ -10,7 +10,7 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [20]  # Pin your desired Node.js version here
+        node-version: [18]  # Pin your Node.js version
 
     steps:
       - name: Checkout code
@@ -27,23 +27,22 @@ jobs:
       - name: Build project
         run: npm run build
 
-      # ✅ Full release zip (excluding .github, including dist)
-      - name: Create full release zip
+      # ✅ Full repo + dist (tar.gz)
+      - name: Create full tar.gz
         run: |
           mkdir release
           rsync -av --progress . ./release --exclude .git --exclude .github --exclude node_modules
-          cd release && zip -r ../pzl-stream-lib-dist.zip .
+          tar -czf pzl-stream-lib-dist.tar.gz -C release .
 
-      # ✅ Dist-only zip
-      - name: Create dist-only zip
-        run: zip -r dist-only.zip dist/
+      # ✅ dist-only (tar.gz)
+      - name: Create dist-only tar.gz
+        run: tar -czf dist-only.tar.gz dist/
 
-      # ✅ Upload both zips to release
-      - name: Upload zips to GitHub Release
+      - name: Upload tar.gz files to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            pzl-stream-lib-dist.zip
-            dist-only.zip
+            pzl-stream-lib-dist.tar.gz
+            dist-only.tar.gz
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
