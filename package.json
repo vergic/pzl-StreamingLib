@@ -1,6 +1,6 @@
 {
   "name": "pzl-stream-lib",
-  "version": "1.6.4",
+  "version": "1.6.5",
   "description": "Internal Streaming library for Puzzel",
   "license": "UNLICENSED",
   "main": "dist/pzl-stream-lib.min.js",
@@ -51,7 +51,6 @@
     "@microsoft/signalr": "^6.0.0",
     "babel-cli": "^7.0.0-beta.3",
     "babel-loader": "^10.0.0",
-    "copy-webpack-plugin": "^12.0.2",
     "cross-env": "^10.1.0",
     "onchange": "^7.1.0",
     "rimraf": "^6.1.3",
