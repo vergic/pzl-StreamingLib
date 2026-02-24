@@ -46,3 +46,13 @@ jobs:
             dist-only.tar.gz
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create npm pack tarball
+        run: npm pack
+
+      # ✅ npm package (tgz)
+      - name: Upload npm package
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            pzl-stream-lib-*.tgz
