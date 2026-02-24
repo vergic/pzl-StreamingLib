@@ -4,7 +4,7 @@ node_modules
 yarn.lock
 
 # Webstorm
-.idea/*
+.idea
 workspace.xml
 tasks.xml
 *.iws

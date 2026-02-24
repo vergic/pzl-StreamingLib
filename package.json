@@ -1,16 +1,31 @@
 {
   "name": "pzl-stream-lib",
-  "version": "1.5.2",
+  "version": "1.6.0",
   "description": "Internal Streaming library for Puzzel",
   "license": "UNLICENSED",
   "main": "dist/pzl-stream-lib.min.js",
   "module": "src/PzlStream.js",
+  "sideEffects": false,
   "exports": {
-    ".": "./dist/pzl-stream-lib.min.js",
+    ".": {
+      "browser": "./dist/pzl-stream-lib.min.js",
+      "import": "./dist/pzl-stream-lib.min.js",
+      "default": "./dist/pzl-stream-lib.min.js"
+    },
+    "./debug": {
+      "browser": "./dist/pzl-stream-lib.js",
+      "import": "./dist/pzl-stream-lib.js",
+      "default": "./dist/pzl-stream-lib.js"
+    },
     "./node": "./dist/pzl-stream-lib.node.min.cjs",
-    "./dist/*": "./dist/*",
-    "./src/*": "./src/*"
+    "./dist/*": "./dist/*"
   },
+  "files": [
+    "dist/**",
+    "README.md",
+    "LICENSE",
+    "package.json"
+  ],
   "engines": {
     "node": ">=16"
   },
@@ -24,21 +39,24 @@
     "prebuild": "rimraf -g dist/*"
   },
   "dependencies": {
-    "@babel/runtime": "^7.27.1",
-    "@microsoft/signalr": "^8.0.7",
     "stately.js": "^2.0.0"
   },
   "devDependencies": {
-    "@babel/core": "^7.27.1",
-    "@babel/plugin-transform-runtime": "^7.27.1",
-    "@babel/preset-env": "^7.27.2",
+    "@babel/core": "^7.29.0",
+    "@babel/plugin-transform-runtime": "^7.29.0",
+    "@babel/preset-env": "^7.29.0",
+    "@babel/runtime": "^7.28.6",
+    "@microsoft/signalr": "^6.0.0",
     "babel-cli": "^7.0.0-beta.3",
     "babel-loader": "^10.0.0",
-    "cross-env": "^7.0.3",
+    "cross-env": "^10.1.0",
     "onchange": "^7.1.0",
-    "rimraf": "^6.0.1",
-    "terser-webpack-plugin": "^5.3.14",
-    "webpack": "^5.99.9",
+    "rimraf": "^6.1.3",
+    "terser-webpack-plugin": "^5.3.16",
+    "webpack": "5.105.2",
     "webpack-cli": "^6.0.1"
+  },
+  "peerDependencies": {
+    "@microsoft/signalr": ">=6.0.0"
   }
 }
