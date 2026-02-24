@@ -1,19 +1,15 @@
 {
   "presets": [
-    [
-      "@babel/env",
-      {
-        "modules": false,
-        "targets": {
-          "edge": "17",
-          "firefox": "60",
-          "chrome": "67",
-          "safari": "11.1"
-        }
-      }
-    ]
+    ["@babel/env", {
+      "modules": false,
+      "targets": {"edge":"17","firefox":"60","chrome":"67","safari":"11.1"}
+    }]
   ],
-  "plugins": [
-    ["@babel/plugin-transform-runtime", { "useESModules": true }]
-  ]
+  "plugins": [["@babel/plugin-transform-runtime", {"useESModules": true}]],
+  "env": {
+    "test": {
+      "presets": [["@babel/env", {"modules": "commonjs", "targets": {"node": "current"}}]],
+      "plugins": [["@babel/plugin-transform-runtime", {"useESModules": false}]]
+    }
+  }
 }
