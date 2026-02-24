@@ -72,7 +72,7 @@ export const initBrokerConnectionFsm = (externals, brokerEventCallbacks = {}, de
                 if (prevState === 'reconnecting') {
                     // If coming here from 'reconnecting', we should resubscribe all subscriptions
                     // (can't be done in 'reconnecting', since reSubscribeAll() will only work in state 'connected'!)
-                    externals.reSubscribeAll();
+                    externals.reSubscribeAll?.()?.catch(() => {});
                 }
                 typeof fsm_state?.brokerEventCallbacks?.onConnectionStarted === 'function' && fsm_state.brokerEventCallbacks.onConnectionStarted(fsm_state.connection);
             },

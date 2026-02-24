@@ -1,6 +1,6 @@
 {
   "name": "pzl-stream-lib",
-  "version": "1.7.0",
+  "version": "1.7.1",
   "description": "Internal Streaming library for Puzzel",
   "license": "UNLICENSED",
   "main": "dist/pzl-stream-lib.min.js",
@@ -47,6 +47,7 @@
   },
   "devDependencies": {
     "@babel/core": "^7.29.0",
+    "@babel/plugin-transform-optional-chaining": "^7.28.6",
     "@babel/plugin-transform-runtime": "^7.29.0",
     "@babel/preset-env": "^7.29.0",
     "@babel/runtime": "^7.28.6",
@@ -54,6 +55,7 @@
     "babel-cli": "^7.0.0-beta.3",
     "babel-jest": "^30.2.0",
     "babel-loader": "^10.0.0",
+    "core-js": "^3.48.0",
     "cross-env": "^10.1.0",
     "jest": "^30.2.0",
     "onchange": "^7.1.0",
